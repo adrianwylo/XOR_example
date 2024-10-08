@@ -1,0 +1,18 @@
+[gd_scene load_steps=4 format=3 uid="uid://ck6flabpfj65y"]
+
+[ext_resource type="Script" path="res://shape_test.gd" id="1_bcpdf"]
+[ext_resource type="Texture2D" uid="uid://dgdtf21xpqcjj" path="res://Untitled.png" id="1_hs87v"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_kffnb"]
+size = Vector2(268, 252)
+
+[node name="Area2D" type="Area2D"]
+script = ExtResource("1_bcpdf")
+speed = null
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1_hs87v")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(-13, -71)
+shape = SubResource("RectangleShape2D_kffnb")
