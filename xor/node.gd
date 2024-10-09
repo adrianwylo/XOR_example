@@ -10,14 +10,12 @@ var node_scale
 #passing in size scale before initializing child
 func initialize_size_scale(size_scale: float) -> void:
 	node_scale = size_scale
-	print("Initialized with shared variable:", node_scale)
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	collision_shape.scale = collision_shape.scale * node_scale
 	sprite.scale = sprite.scale * node_scale
 	
-
 	
 func _process(delta: float) -> void:
 	pass
