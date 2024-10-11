@@ -7,6 +7,10 @@ var screen_size # Size of the game window.
 var dragging = false # To track if the object is being dragged
 var drag_offset = Vector2() # Offset between mouse position and the object when dragging
 
+
+# Define the polygon points
+
+
 # Causes entry
 func start(pos):
 	position = pos
@@ -14,7 +18,19 @@ func start(pos):
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	screen_size = get_viewport_rect().size
+	pass
+
+#creates nodes for shape
+func create_2D(vertices) -> void:
+	#Create Polygon2D child
+	var polygon2d = Polygon2D.new()
+	polygon2d.polygon = vertices
+	add_child(polygon2d)  # Add Polygon2D to the parent node
+
+	# Create the CollisionPolygon2D child
+	var collision_polygon = CollisionPolygon2D.new()
+	collision_polygon.polygon = vertices
+	add_child(collision_polygon)  # Add CollisionPolygon2D to the parent node
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == 1 and event.pressed:

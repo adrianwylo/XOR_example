@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://dhnmaakqdptlo"]
+[gd_scene load_steps=7 format=3 uid="uid://dhnmaakqdptlo"]
 
 [ext_resource type="PackedScene" uid="uid://ck6flabpfj65y" path="res://shape_test.tscn" id="1_1w1ic"]
 [ext_resource type="Script" path="res://main.gd" id="1_yesy6"]
 [ext_resource type="PackedScene" uid="uid://3euynf7d8fyy" path="res://node.tscn" id="2_vuyjw"]
 [ext_resource type="Script" path="res://grid_pieces.gd" id="4_nvdvr"]
 [ext_resource type="Script" path="res://shape_pieces.gd" id="5_jxtif"]
+[ext_resource type="Script" path="res://solution.gd" id="6_0c0vp"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_yesy6")
@@ -22,6 +23,15 @@ new_node = ExtResource("2_vuyjw")
 script = ExtResource("5_jxtif")
 new_shape = ExtResource("1_1w1ic")
 
+[node name="Solution" type="Node2D" parent="."]
+script = ExtResource("6_0c0vp")
+
+[node name="Solution_Grid" type="Node2D" parent="Solution"]
+
+[node name="Solution_Shapes" type="Node2D" parent="Solution"]
+
 [connection signal="init_grid" from="." to="Grid_Pieces" method="_on_main_init_grid"]
 [connection signal="init_shapes" from="." to="Shape Pieces" method="_on_main_init_shapes"]
+[connection signal="init_solution" from="." to="Solution" method="_on_main_init_solution"]
 [connection signal="click" from="shape_1" to="." method="_on_shape_click"]
+[connection signal="grid_done" from="Grid_Pieces" to="." method="_on_grid_pieces_grid_done"]

@@ -29,6 +29,7 @@ func _process(delta: float) -> void:
 
 # Called by main
 func _on_main_init_grid(n_c, s_s, m_s) -> void:
+	print("init grid")
 	node_count = n_c
 	screen_size = s_s
 	margin_size = m_s
