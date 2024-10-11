@@ -36,7 +36,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	pass
 
-#creaate seni random array of areas for shapes
+#create seni random array of areas for shapes
 func make_area_bins(diff, total_area, shape_count) -> Array:
 	var base_val = floor(total_area/shape_count)
 	
@@ -63,11 +63,10 @@ func make_area_bins(diff, total_area, shape_count) -> Array:
 				missing_diff+=1
 			else:
 				continue
-	
 	return shape_areas
 
 
-#INCOMPLETE populates parameters for solution generator
+#populates parameters for solution generator
 func process_difficulty(diff) -> void:
 	print("difficulty is " + str(diff))
 	#percentage of max_shape number created
@@ -84,13 +83,76 @@ func process_difficulty(diff) -> void:
 		angle_225_prob = 0
 	angle_reg_prob = (1 - angle_225_prob)/2
 	
-	#calculations for shape variation 
+	#calculations for shape variation  
 	shape_areas = make_area_bins(diff, total_area, shape_count)
 	print("here are the areas that add up to " + str(total_area))
 	print(shape_areas)
+
+#returns true or false with a given probability
+func probability_check(prob: float) -> bool:
+	return randf() <= prob
+
+#randomly chooses a direction (input = blacklisted options)
+func choose_direction(no: Array) -> int:
+	assert(len(no) < 4, "can't say no to all 4 buddy")
+	var dir = randi_range(0,3)
+	if dir in no:
+		return choose_direction(no)
+	else:
+		return dir
 	
 	
+
+
+func map_shapes() -> void:
+	#NOTES:
+	#[0 = up, 1 = down, 2 = left, 3 = right]
+	#this is an up triangle:                   this is a down triangle
+	#      /|                                  ____.
+	#     / |                                  |  /
+	#    /  |                                  | /
+	#   /___|                                  |/
+	#
+	#for 22.5 degree angles, we use probability check to determine which side is longer
 	
+	#for 2 choice items (l/r and u/d)
+	#[0 = u/d, 1 = l/r]
+	
+	for shape_areas in shape_areas:
+		#this it the top/leftmost corner of shape (does not have to be vertex)
+		var tl_reference_pos = Vector2(0,0)
+		var br_reference_pos = Vector2(0,0)
+		
+		#lengths of edges + coordinates
+		var o_left = {}
+		var o_right = {}
+		var o_down = {}
+		var o_up = {}
+		
+		#used to call on dics based on randomized index
+		var open_lines = [o_left, o_right, o_down, o_up]
+		
+		#keep track of unavailable lines
+		var blacklist = []
+		var unfilled_area = shape_areas
+		
+		
+		#create base shape
+		
+		#choose shape
+		#choose rotation
+		
+		
+		#fill up edges of shape until can't anymore
+		
+			#choose side
+			#choose shape
+			#calc edge possibilities
+			#update reference_pos
+			
+			
+		
+		
 
 func _on_main_init_solution(node_count: Variant, difficulty: Variant) -> void:
 	#note that max_shape_count is moreso tied to node count than anything
@@ -99,6 +161,7 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant) -> void:
 	total_area = floor(node_count*node_count*0.9)
 	
 	process_difficulty(difficulty)
+	map_shapes()
 	
 	
 	pass # Replace with function body.
