@@ -26,6 +26,8 @@ var dragging = false
 
 #MAPPING
 var map
+#length of one grid unit in pxls
+var grid_len
 
 #Physics variables:
 # Size of the game window
@@ -43,18 +45,17 @@ var click_event
 func coor_to_px(vertex: Vector2) -> Vector2:
 	var x_key = str(vertex.x)
 	var y_key = str(vertex.y)
-	if map.has(x_key) and map[x_key].has(y_key):
-		return map[x_key][y_key]
-	else:
-		print("Coordinates not found in map!")
-		return Vector2.ZERO  # Return a default value if coordinates not found
-
+	assert(map.has(x_key), "x not found")
+	assert(map[x_key].has(y_key), "y not found")
+	return map[x_key][y_key]
 
 #converts packed vertex array  into pixel coordinates
-func pol_coor_to_px(vertices: PackedVector2Array) -> PackedVector2Array:
+func pol_coor_to_px(vertices: PackedVector2Array, offset: Vector2) -> PackedVector2Array:
 	var converted = PackedVector2Array()
+	var converted_offset = coor_to_px(offset)
 	for vertex in vertices:
-		converted.append(coor_to_px(vertex))
+		var new_pos = coor_to_px(vertex)-converted_offset
+		converted.append(new_pos)
 	return converted
 
 # Called when the node enters the scene tree for the first time.
@@ -63,11 +64,11 @@ func _ready() -> void:
 	if playable_pieces:
 		playable_pieces.connect("go", _start_dragging)
 		playable_pieces.connect("stop", _stop_dragging)
-	#??????
-	position = tl_pos
-	area_offset = coor_to_px(br_pos - tl_pos)
-	pol2d.polygon = pol_coor_to_px(packed_vertices)
-	col2d.polygon = pol_coor_to_px(packed_vertices)
+	position = coor_to_px(tl_pos)
+	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
+	pol2d.polygon = pol_coor_to_px(packed_vertices, tl_pos)
+	col2d.polygon = pol_coor_to_px(packed_vertices, tl_pos)
+	#will remove
 	var random_color = Color(randf(), randf(), randf())
 	pol2d.modulate = random_color
 	screen_size = get_viewport_rect().size
@@ -81,12 +82,12 @@ func pass_vertices(vertices) -> void:
 func pass_metadata(tl, br, id) -> void:
 	tl_pos = tl
 	br_pos = br
-	
 	identity = id
 
 #save map from coordinate to position
 func pass_map(pos_dic) -> void:
 	map = pos_dic
+	grid_len = map['1']['0'].x - map['0']['0'].x 
 
 #Click event handler
 func _input(event: InputEvent) -> void:
@@ -98,7 +99,7 @@ func _input(event: InputEvent) -> void:
 		else:
 			if Geometry2D.is_point_in_polygon(to_local(event.position), $CollisionPolygon2D.polygon):
 				#request to start dragging
-				print(str(identity)+" wants to move")
+				print(str(identity)+" wants to move from pos " + str(position))
 				emit_signal("occupy_drag", identity)
 
 #reacts to go ack
@@ -106,12 +107,14 @@ func _start_dragging(id):
 	if id == identity:
 		dragging = true
 		drag_offset = position - click_event.position
+		playable_pieces.move_child(self, playable_pieces.get_child_count() - 1) 
 
 #reacts to stop ack
 func _stop_dragging(id):
 	if id == identity:
 		dragging = false
 		#facilitate snap
+		print(click_event.position)
 		emit_signal("continue_q", identity)
 
 #clamps shape movement

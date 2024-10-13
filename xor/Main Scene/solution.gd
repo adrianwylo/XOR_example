@@ -307,9 +307,9 @@ func map_shapes() -> void:
 	
 	#SHAPES WILL BE DRAWN WITH CLOCKWISE DIRECTION
 	final_metadata = [playable_metadata.new([Vector2(0,0),Vector2(1,0),Vector2(1,1),
-											 Vector2(0,1),Vector2(0,0)],Vector2(0,0),Vector2(1,1), 0),
-					  playable_metadata.new([Vector2(0,0),Vector2(1,0),Vector2(1,1),
-											 Vector2(0,1),Vector2(0,0)], Vector2(2,0),Vector2(3,1), 1)]
+											 Vector2(0,1),Vector2(0,0)],Vector2(0,0),Vector2(1,1), 0), 
+											playable_metadata.new([Vector2(1,0),Vector2(2,0),Vector2(2,1),
+											 Vector2(1,1),Vector2(1,0)], Vector2(1,0),Vector2(2,1), 1)]
 					
 	for shape_areas in shape_areas:
 		#this it the top/leftmost corner of shape (does not have to be vertex)

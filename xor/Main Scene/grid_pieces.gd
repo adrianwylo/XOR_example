@@ -13,6 +13,8 @@ var margin_size
 var node_count
 #dictionary of all grid positions: 
 var pos_dic = {}
+#length of one grid cell
+var len_of_cell
 #-------------------------------------------------------------------------------
 
 #signal for completion
@@ -44,22 +46,23 @@ func create_grid() -> void:
 	var grid_offset = Vector2((screen_size.x - grid_size_m)/2, 
 							  (screen_size.y - grid_size_m)/2)
 	
-	#not counting margins, length of one side of grid
+	#not counting margins, length of one side of full grid
 	var grid_size = grid_size_m * (1 - margin_size*2)
 	var margin_offset = Vector2(grid_size*margin_size, grid_size*margin_size)
 	
-	#add margin offset to grid_offset
+	#changes position of grid
 	grid_offset += margin_offset
+	len_of_cell = grid_size/(node_count-1)
 	
 	#decide scale of nodes with reference to screen size
-	size_scale = 0.2#temp placeholder
+	size_scale = 0.02#temp placeholder
 	
 	#added 2 to contribute to the a buffer 
 	for x in range(0, node_count):
 		pos_dic[str(x)] = {}
 		for y in range(0, node_count):
 			#(- 1 because includes 2 divisions = 3 points)
-			var node_pos = (grid_size/(node_count-1)) * Vector2(x,y) + grid_offset
+			var node_pos = len_of_cell * Vector2(x,y) + grid_offset
 			pos_dic[str(x)][str(y)] = node_pos
 			node_create(node_pos)
 
@@ -69,5 +72,8 @@ func create_grid() -> void:
 func node_create(pos: Vector2) -> void:
 	var node = new_node.instantiate()
 	node.position = pos
-	node.initialize_size_scale(size_scale)
-	add_child(node)	
+	print("length of cell is " + str(len_of_cell) + " and length of box is ")
+	
+	
+	node.initialize_data(size_scale, len_of_cell)
+	add_child(node)

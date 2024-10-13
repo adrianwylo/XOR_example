@@ -12,7 +12,8 @@ var screen_size
 var margin_size = 0.1
 # amount of nodes on one side of the grid (must be greater than 1) 
 #(Enact a min limit for effectiveness of puzzle)
-var node_count = 6
+var node_count = 20
+
 #-------------------------------------------------------------------------------
 
 #true if grid created

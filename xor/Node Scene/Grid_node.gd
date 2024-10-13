@@ -8,14 +8,23 @@ extends StaticBody2D
 
 #size scale determined by the main scene
 var node_scale
+#length of one grid cell
+var len_of_cell
 
-#passing in size scale before initializing child
-func initialize_size_scale(size_scale: float) -> void:
+#passing in size scale and length of cell
+func initialize_data(size_scale: float, length: float) -> void:
 	node_scale = size_scale
+	len_of_cell = length
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	collision_shape.scale = collision_shape.scale * node_scale
+	var half_len = len_of_cell/2
+	collision_shape.polygon = PackedVector2Array([Vector2(-half_len,-half_len),
+												  Vector2(half_len,-half_len),
+												  Vector2(half_len,half_len),
+												  Vector2(-half_len,half_len),
+												  Vector2(-half_len,-half_len)])
+	print(collision_shape.polygon)
 	sprite.scale = sprite.scale * node_scale
 
 func _process(delta: float) -> void:
