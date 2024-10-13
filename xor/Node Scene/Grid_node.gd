@@ -2,8 +2,9 @@ extends StaticBody2D
 
 # Reference to the CollisionShape2D node
 @onready var collision_shape = $CollisionPolygon2D
- # Reference to the Sprite node
+# Reference to the Sprite node
 @onready var sprite = $Sprite2D 
+
 
 #size scale determined by the main scene
 var node_scale

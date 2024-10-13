@@ -87,6 +87,18 @@ class Vertex:
 			current_vertex = current_vertex.nextVertex
 		return [Vector2i(min_x, min_y), Vector2i(max_x, max_y)]
 
+#final info datatype passed to playable_pieces scene
+class playable_metadata:
+	var vertices: Array
+	var tl: Vector2
+	var br: Vector2
+	
+	func _init(vertex_array: Array, top_left: Vector2, bottom_right: Vector2) -> void:
+		vertices = vertex_array
+		tl = top_left
+		br = bottom_right
+		
+
 #variables for solution creation------------------------------------------------
 #must be creater than 0
 var max_shape_count # for now directly equal to difficulty * 2
@@ -108,6 +120,9 @@ var shape_areas
 
 #array of array of vertices that make up polygon
 var mapped_shapes
+
+#array of metadata for playable pieces
+var final_metadata
 #WILL BE MORE... (consolidate difficulty rating within this function)
 #-------------------------------------------------------------------------------
 #in-built
@@ -289,8 +304,10 @@ func map_shapes() -> void:
 	#[0 = u/d, 1 = l/r]
 	
 	#SHAPES WILL BE DRAWN WITH CLOCKWISE DIRECTION
-	mapped_shapes = [[Vector2(0,0),Vector2(100,0),Vector2(100,100),Vector2(0,100),Vector2(0,0)],
-					 [Vector2(100,100),Vector2(200,100),Vector2(200,200),Vector2(100,200),Vector2(100,100)]]
+	final_metadata = [playable_metadata.new([Vector2(0,0),Vector2(100,0),Vector2(100,100),
+											 Vector2(0,100),Vector2(0,0)],Vector2(0,0),Vector2(100,100)),
+					  playable_metadata.new([Vector2(0,0),Vector2(100,0),Vector2(100,100),
+											 Vector2(0,100),Vector2(0,0)], Vector2(200,0),Vector2(300,100))]
 					
 	for shape_areas in shape_areas:
 		#this it the top/leftmost corner of shape (does not have to be vertex)
@@ -343,5 +360,5 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant) -> void:
 	
 	#AT THE MOMENT THESE ARE JUST RANDO SHAPES, BUT WE NEED PLAYABLE PIECES AND SOLUTION PIECES
 	#WHEN PASSED IN, THESE HAVE TO BE POSITIONS NOT JUST COORDINATES
-	emit_signal("create_pieces", mapped_shapes)
+	emit_signal("create_pieces", final_metadata)
 	

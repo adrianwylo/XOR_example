@@ -65,9 +65,8 @@ func create_grid() -> void:
 
 	#might want to consider looking at how screen size changes will affect the grid		
 
-# initiates node scenes as main children
+# Create a new instance of the node scene
 func node_create(pos: Vector2) -> void:
-	# Create a new instance of the node scene.
 	var node = new_node.instantiate()
 	node.position = pos
 	node.initialize_size_scale(size_scale)

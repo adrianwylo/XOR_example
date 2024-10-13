@@ -11,17 +11,16 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	pass
 
-
-func shape_create(vertice_list) -> void:
-	#create new instance of the playable_shape scene
+#create new instance of the playable_shape scene
+func shape_create(metadata) -> void:
 	var shape = new_shape.instantiate()
-	shape.position = Vector2.ZERO
-	shape.pass_vertices(vertice_list)
+	shape.pass_vertices(metadata.vertices)
+	shape.pass_position(metadata.tl, metadata.br)
 	add_child(shape)
 
 #creates pieces on board from list of list of positions
 func _on_solution_create_pieces(shape_pieces: Variant) -> void:
-	print("starting to make pieces")
 	for polygon in shape_pieces:
+		#remember the format is polygon[0] is positional displacement
 		shape_create(polygon)
 		
