@@ -1,7 +1,7 @@
 extends Node2D
 #Generate the solutions and thus the logic behind all assets
 
-signal create_pieces(shape_pieces)
+signal create_pieces(shape_pieces, position_dictionary)
 
 #scale of 1 to 5
 var diff_max = 5
@@ -92,11 +92,13 @@ class playable_metadata:
 	var vertices: Array
 	var tl: Vector2
 	var br: Vector2
+	var id: int
 	
-	func _init(vertex_array: Array, top_left: Vector2, bottom_right: Vector2) -> void:
+	func _init(vertex_array: Array, top_left: Vector2, bottom_right: Vector2, identity: int) -> void:
 		vertices = vertex_array
 		tl = top_left
 		br = bottom_right
+		id = identity
 		
 
 #variables for solution creation------------------------------------------------
@@ -304,10 +306,10 @@ func map_shapes() -> void:
 	#[0 = u/d, 1 = l/r]
 	
 	#SHAPES WILL BE DRAWN WITH CLOCKWISE DIRECTION
-	final_metadata = [playable_metadata.new([Vector2(0,0),Vector2(100,0),Vector2(100,100),
-											 Vector2(0,100),Vector2(0,0)],Vector2(0,0),Vector2(100,100)),
-					  playable_metadata.new([Vector2(0,0),Vector2(100,0),Vector2(100,100),
-											 Vector2(0,100),Vector2(0,0)], Vector2(200,0),Vector2(300,100))]
+	final_metadata = [playable_metadata.new([Vector2(0,0),Vector2(1,0),Vector2(1,1),
+											 Vector2(0,1),Vector2(0,0)],Vector2(0,0),Vector2(1,1), 0),
+					  playable_metadata.new([Vector2(0,0),Vector2(1,0),Vector2(1,1),
+											 Vector2(0,1),Vector2(0,0)], Vector2(2,0),Vector2(3,1), 1)]
 					
 	for shape_areas in shape_areas:
 		#this it the top/leftmost corner of shape (does not have to be vertex)
@@ -348,17 +350,15 @@ func map_shapes() -> void:
 			#update reference_pos
 
 #script call
-func _on_main_init_solution(node_count: Variant, difficulty: Variant) -> void:
+func _on_main_init_solution(node_count: Variant, difficulty: Variant, pos_dic: Variant) -> void:
 	#note that max_shape_count is moreso tied to node count than anything
 	max_shape_count = node_count*node_count/3
 	#note that this is in units of grid_index squared
 	total_area = floor(node_count*node_count*0.9)
-	
 	process_difficulty(difficulty)
 	#populates 
 	map_shapes()
-	
 	#AT THE MOMENT THESE ARE JUST RANDO SHAPES, BUT WE NEED PLAYABLE PIECES AND SOLUTION PIECES
 	#WHEN PASSED IN, THESE HAVE TO BE POSITIONS NOT JUST COORDINATES
-	emit_signal("create_pieces", final_metadata)
+	emit_signal("create_pieces", final_metadata, pos_dic)
 	

@@ -28,12 +28,12 @@ func _process(delta: float) -> void:
 
 # Called by main
 func _on_main_init_grid(n_c, s_s, m_s) -> void:
-	print("init grid")
 	node_count = n_c
 	screen_size = s_s
 	margin_size = m_s
 	create_grid()
 	emit_signal("grid_done", pos_dic)
+	
 	
 #1. creates the child nodes to make up grid
 #2. populates pos_dic:
@@ -56,11 +56,11 @@ func create_grid() -> void:
 	
 	#added 2 to contribute to the a buffer 
 	for x in range(0, node_count):
-		pos_dic[x] = {}
+		pos_dic[str(x)] = {}
 		for y in range(0, node_count):
 			#(- 1 because includes 2 divisions = 3 points)
 			var node_pos = (grid_size/(node_count-1)) * Vector2(x,y) + grid_offset
-			pos_dic[x][y] = node_pos
+			pos_dic[str(x)][str(y)] = node_pos
 			node_create(node_pos)
 
 	#might want to consider looking at how screen size changes will affect the grid		
