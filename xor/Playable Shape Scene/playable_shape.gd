@@ -1,36 +1,37 @@
 extends Area2D
 signal click
 
+# Reference to the CollisionPolygon2D node
+@onready var col2d = $CollisionPolygon2D
+ # Reference to the Polygon2D node
+@onready var pol2d = $Polygon2D 
+
 # How fast piece moves when snapping
 @export var clip_speed = 400 
-var screen_size # Size of the game window.
-var dragging = false # To track if the object is being dragged
-var drag_offset = Vector2() # Offset between mouse position and the object when dragging
 
+# Size of the game window
+var screen_size 
 
-# Define the polygon points
+# To track if the object is being dragged
+var dragging = false 
 
+# Offset between mouse position and the object when dragging
+var drag_offset = Vector2() 
 
-# Causes entry
-func start(pos):
-	position = pos
-	show()
+#packaged vertices for polygon definition
+var packed_vertices
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	pass
+	pol2d.polygon = packed_vertices
+	col2d.polygon = packed_vertices
+	screen_size = get_viewport_rect().size
 
-#creates nodes for shape
-func create_2D(vertices) -> void:
-	#Create Polygon2D child
-	var polygon2d = Polygon2D.new()
-	polygon2d.polygon = vertices
-	add_child(polygon2d)  # Add Polygon2D to the parent node
-
-	# Create the CollisionPolygon2D child
-	var collision_polygon = CollisionPolygon2D.new()
-	collision_polygon.polygon = vertices
-	add_child(collision_polygon)  # Add CollisionPolygon2D to the parent node
+#saves in position vectors for when ready
+func pass_vertices(vertices) -> void:
+	print(vertices)
+	packed_vertices = PackedVector2Array(vertices)
+	print("created Packed_Vertex")
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == 1 and event.pressed:
@@ -45,11 +46,12 @@ func _input(event: InputEvent) -> void:
 				drag_offset = position - event.position
 			
 
-
 #determines position
 func _process(delta: float) -> void:
+	
 	if dragging:
 		position = get_global_mouse_position() + drag_offset
+		print(position)
 		position = position.clamp(Vector2.ZERO, screen_size) # Ensure object stays within screen bounds
 
 

@@ -22,7 +22,6 @@ signal grid_done(pos_dic)
 func _ready() -> void:
 	pass # Replace with function body.
 
-
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
 	pass
@@ -63,7 +62,7 @@ func create_grid() -> void:
 			var node_pos = (grid_size/(node_count-1)) * Vector2(x,y) + grid_offset
 			pos_dic[x][y] = node_pos
 			node_create(node_pos)
-			
+
 	#might want to consider looking at how screen size changes will affect the grid		
 
 # initiates node scenes as main children
@@ -72,5 +71,4 @@ func node_create(pos: Vector2) -> void:
 	var node = new_node.instantiate()
 	node.position = pos
 	node.initialize_size_scale(size_scale)
-	# Spawn the node into Main.
 	add_child(node)	

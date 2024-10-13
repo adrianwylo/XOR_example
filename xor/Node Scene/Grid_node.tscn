@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://3euynf7d8fyy"]
 
-[ext_resource type="Script" path="res://node.gd" id="1_1av61"]
-[ext_resource type="Texture2D" uid="uid://gsc7vr3xx5yu" path="res://dont_node.png" id="2_r4dhp"]
+[ext_resource type="Script" path="res://Node Scene/Grid_node.gd" id="1_1av61"]
+[ext_resource type="Texture2D" uid="uid://bgl1c4vqrv4ck" path="res://Assets/node_image.png" id="2_r4dhp"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_5bdii"]
 
