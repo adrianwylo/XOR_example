@@ -6,11 +6,12 @@ extends Node2D
 var dragging = false 
 
 #Current dragged shape
-var dragged_shape_id
+var dragged_shape_id = -1
 
 #Ack signals for shapes
 signal go(id)
-signal stop(id)
+signal snap(id, mouse_pos)
+signal start_snap(grid_pos, id)
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -33,7 +34,7 @@ func shape_create(metadata, map) -> void:
 
 #ack function picking a piece
 func _on_piece_occupy_drag(id) -> void:
-	if dragging == false:
+	if dragging == false and dragged_shape_id == -1:
 		dragged_shape_id = id
 		dragging = true
 		print(str(id) + " can move")
@@ -41,11 +42,14 @@ func _on_piece_occupy_drag(id) -> void:
 	else:
 		print("occupied by " + str(dragged_shape_id) + ", " + str(id) + " cannot move")
 
-#ack function for letting go of piece
-func _on_piece_free_drag(id) -> void:
+#ack function for letting go of piece (requests grid nodes for info)
+func _on_piece_free_drag(id, corner_pos) -> void:
 	if dragged_shape_id == id:
-		print(str(id) + " can stop")
-		emit_signal("stop", id)
+		emit_signal("snap", id, corner_pos)
+
+#pipe grid coordinates to shape
+func _on_grid_pieces_snap_info(grid_pos: Variant) -> void:
+	emit_signal("start_snap", grid_pos, dragged_shape_id)
 
 #reopen function for next piece picked
 func _on_piece_continue_q(id) -> void:

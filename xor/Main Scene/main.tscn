@@ -28,4 +28,6 @@ script = ExtResource("6_0c0vp")
 [connection signal="init_grid" from="." to="Grid_Pieces" method="_on_main_init_grid"]
 [connection signal="init_solution" from="." to="Solution" method="_on_main_init_solution"]
 [connection signal="grid_done" from="Grid_Pieces" to="." method="_on_grid_pieces_grid_done"]
+[connection signal="snap_info" from="Grid_Pieces" to="playable_pieces" method="_on_grid_pieces_snap_info"]
+[connection signal="snap" from="playable_pieces" to="Grid_Pieces" method="_on_playable_pieces_snap"]
 [connection signal="create_pieces" from="Solution" to="playable_pieces" method="_on_solution_create_pieces"]

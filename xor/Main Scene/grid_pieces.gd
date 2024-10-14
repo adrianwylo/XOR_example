@@ -20,8 +20,11 @@ var len_of_cell
 #signal for completion
 signal grid_done(pos_dic)
 
+signal snap_info(grid_pos)
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
+	
 	pass # Replace with function body.
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
@@ -61,19 +64,27 @@ func create_grid() -> void:
 	for x in range(0, node_count):
 		pos_dic[str(x)] = {}
 		for y in range(0, node_count):
+			var is_edge = (x == node_count - 1 or y == node_count - 1)
 			#(- 1 because includes 2 divisions = 3 points)
 			var node_pos = len_of_cell * Vector2(x,y) + grid_offset
 			pos_dic[str(x)][str(y)] = node_pos
-			node_create(node_pos)
+			#create node as child
+			var node = new_node.instantiate()
+			node.connect("snap_found", _on_snap_found)
+			node.position = node_pos
+			node.initialize_data(size_scale, len_of_cell, Vector2i(int(x),int(y)), is_edge)
+			add_child(node)
 
 	#might want to consider looking at how screen size changes will affect the grid		
+	
 
-# Create a new instance of the node scene
-func node_create(pos: Vector2) -> void:
-	var node = new_node.instantiate()
-	node.position = pos
-	print("length of cell is " + str(len_of_cell) + " and length of box is ")
+func _on_snap_found(grid_coor):
+	emit_signal("snap_info", grid_coor)
+
+#query children for a snap
+func _on_playable_pieces_snap(id: Variant, corner_pos: Variant) -> void:
+	var child_count = get_child_count()
+	for i in range(child_count):
+		var child = get_child(i)
+		child.check_snap(corner_pos)
 	
-	
-	node.initialize_data(size_scale, len_of_cell)
-	add_child(node)
