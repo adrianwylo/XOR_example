@@ -92,13 +92,11 @@ class playable_metadata:
 	var vertices: Array
 	var tl: Vector2
 	var br: Vector2
-	var id: int
 	
-	func _init(vertex_array: Array, top_left: Vector2, bottom_right: Vector2, identity: int) -> void:
+	func _init(vertex_array: Array, top_left: Vector2, bottom_right: Vector2) -> void:
 		vertices = vertex_array
 		tl = top_left
 		br = bottom_right
-		id = identity
 		
 
 #variables for solution creation------------------------------------------------
@@ -306,10 +304,10 @@ func map_shapes() -> void:
 	#[0 = u/d, 1 = l/r]
 	
 	#SHAPES WILL BE DRAWN WITH CLOCKWISE DIRECTION
-	final_metadata = [playable_metadata.new([Vector2(0,0),Vector2(1,0),Vector2(1,1),
-											 Vector2(0,1),Vector2(0,0)],Vector2(0,0),Vector2(1,1), 0),
+	final_metadata = [playable_metadata.new([Vector2(0,0),Vector2(2,0),Vector2(2,2),
+											 Vector2(0,2),Vector2(0,0)],Vector2(0,0),Vector2(2,2)),
 											playable_metadata.new([Vector2(1,0),Vector2(2,0),Vector2(2,1),
-											 Vector2(1,1),Vector2(1,0)], Vector2(1,0),Vector2(2,1), 1)]
+											 Vector2(1,1),Vector2(1,0)], Vector2(1,0),Vector2(2,1))]
 					
 	for shape_areas in shape_areas:
 		#this it the top/leftmost corner of shape (does not have to be vertex)
