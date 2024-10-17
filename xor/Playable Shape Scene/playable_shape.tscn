@@ -1,11 +1,15 @@
-[gd_scene load_steps=2 format=3 uid="uid://ck6flabpfj65y"]
+[gd_scene load_steps=3 format=3 uid="uid://ck6flabpfj65y"]
 
 [ext_resource type="Script" path="res://Playable Shape Scene/playable_shape.gd" id="1_bcpdf"]
+[ext_resource type="PackedScene" uid="uid://cm20ayafm2l7i" path="res://Playable Shape Scene/fragment/overlap.tscn" id="3_0k1lm"]
 
 [node name="Puzzle_Shape" type="Area2D"]
 script = ExtResource("1_bcpdf")
+new_poly = ExtResource("3_0k1lm")
 
 [node name="click_col2d" type="CollisionPolygon2D" parent="."]
 
+[connection signal="area_shape_entered" from="." to="." method="_on_area_shape_entered"]
+[connection signal="area_shape_exited" from="." to="." method="_on_area_shape_exited"]
 [connection signal="mouse_entered" from="." to="." method="_on_mouse_entered"]
 [connection signal="mouse_exited" from="." to="." method="_on_mouse_exited"]

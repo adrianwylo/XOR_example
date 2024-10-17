@@ -2,6 +2,7 @@ extends Area2D
 
 # Reference to the 2D nodes:
 @onready var base_col2d = $click_col2d
+@export var new_poly: PackedScene
 
 #parent node for signal management:
 var playable_pieces
@@ -10,17 +11,8 @@ var playable_pieces
 signal occupy_drag(identity)
 signal free_drag(identity, click_location)
 signal continue_q(identity)
-
-#metadata class for polygon children
-class fragment:
-	var shape: Array
-	var parity: bool
-	var index: int
-	
-	func _init(vertices: Array, is_visible: bool, id: int = -1):
-		shape = vertices
-		parity = is_visible
-		index = id
+signal overlapping(other_id, my_id)
+signal not_overlapping(other_id, my_id)
 
 #passed metadata:
 #top left corner of shape (coordinates)
@@ -42,7 +34,7 @@ var snapping = false
 var mouse_offset
 #target for linear interpolation
 var snap_target
-#list of visible_pieces (and invisible ones) (does not include base shape)
+#list of references to visible_pieces (and invisible ones) 
 var fragments
 #to access position (pxls) just use position
 
@@ -62,6 +54,10 @@ var snap_speed = 10
 var area_offset
 #metadata from click instance
 var click_event
+
+# Returns shape ID for collision identification
+func return_id():
+	return identity
 
 # Converts a single vertex into pixel coordinates
 func coor_to_px(vertex: Vector2) -> Vector2:
@@ -99,28 +95,28 @@ func _ready() -> void:
 	screen_size = get_viewport_rect().size
 	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
 	
+	#NOTE the coordinates passsed in here are relative to the position already
+	var base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
 	# create base shape
-	var pol2d = Polygon2D.new()
-	pol2d.polygon = pol_coor_to_px(packed_vertices, tl_pos)
-	#will remove
-	var random_color = Color(randf(), randf(), randf())
-	pol2d.modulate = random_color
-	add_child(pol2d)
-	#the id is -2 because 0-indexed and first child is collision
-	fragments = [fragment.new(packed_vertices, true, get_child_count()-2)]
+	var base_pol2d = new_poly.instantiate()
+	base_pol2d.add_polygon(base_shape_vertices) 
+	base_pol2d.set_polarity(true)
+	base_pol2d.set_overlaps([])
+	
+	# add child to tree
+	add_child(base_pol2d)
+	#create fragment  list
+	fragments = [base_pol2d]
 	
 	# create clickable collision
-	base_col2d.polygon = pol_coor_to_px(packed_vertices, tl_pos)
-	
-	
+	base_col2d.polygon = base_shape_vertices
 
 #process passed metadata
-func pass_metadata(vertices, tl, br) -> void:
-	assert(len(vertices) > 2, "not a shape")
+func pass_metadata(vertices: Array, tl: Vector2, br: Vector2) -> void:
+	assert(vertices.size() > 2, "not a shape")
 	packed_vertices = PackedVector2Array(vertices)
 	tl_pos = tl
 	br_pos = br
-	
 
 #save map from coordinate to position
 func pass_map(pos_dic) -> void:
@@ -174,17 +170,112 @@ func _process(delta: float) -> void:
 
 #regurgitates collision2D's vertices + position
 func return_polygon_info() -> Array:
-	#needs additional logic
 	return [fragments, position, identity]
 
+#function for modifying the vertices of an show and its child representation
+func modify_pol_frags(overlap: Node, new_vertices: Array):
+	#IT IS IN HERE THAT WE HAVE TO FILTER OUT HOW TO READ FUNCTION OUTPUTS
+	overlap.replace_polygon(new_vertices)
+
+#redoing of intersect_polygon for overlaps (amd their multiple polygons)
+func intersect_overlaps(A: Area2D, B: Area2D) -> Array:
+	var A_shapes = A.ret_polygons()
+	var B_shapes = B.ret_polygons()
+	assert(not A_shapes.empty(), "empty A (int)")
+	assert(not B_shapes.empty(), "empty B (int)")
+	var final_intersect = []
+	for a in A_shapes:
+		for b in B_shapes:
+			var intersections = Geometry2D.intersect_polygons(a, b)
+			if intersections.size() > 0:
+				final_intersect.append_array(intersections) 
+	return final_intersect
+
+#redoing of clip_polygon for overlaps (and their multiple polygons)
+func clip_overlaps(A: Area2D, B: Area2D) -> Array:
+	var A_shapes = A.ret_polygons()
+	var B_shapes = B.ret_polygons()
+	assert(not A_shapes.empty(), "empty A (clip)")
+	assert(not B_shapes.empty(), "empty B (clip)")
+	var final_clip = []
+	for a in A_shapes:
+		for b in B_shapes:
+			var clips = Geometry2D.clip_polygons(a, b)
+			if clips.size() > 0:
+				final_clip.append_array(clips) 
+	return final_clip
+
+#function for adding child rep in fragments
+func create_new_frag_node(polarity: bool, new_vertices: Array,  involved_ids: Array = []):
+	var new_frag =  new_poly.instantiate()
+	#make new vertices
+	new_frag.add_polygon(new_vertices)
+	new_frag.set_overlaps(involved_ids)
+	new_frag.set_polarity(polarity)
+	#add child and add fragment to fragments
+	add_child(new_frag)
+	fragments.append(new_frag)
+	
+
 #logic handler for xor mechanic
-func _check_overlap_A(vertices, pos, id):
+func _check_overlap_A(other_fragments, other_pos, other_id, id):
+	if id != identity:
+		pass
+	#STILL HAVE TO GO OVER LOGIC REGARDING HANDLING BASE CASE 
+	#BASE CASE ONLY MATTERS IF THERE ARE 2 CHILDREN (MAY NOT MATTER)
+	
+	for other_fragment in other_fragments:
+		var other_polarity = other_fragment.show_polarity
+		var B_list = other_fragment.show_overlap() 
+		B_list.append(other_id)
+		for fragment in fragments:
+			var my_polarity = fragment.show_polarity
+			#save list of involved ids in other node
+			if fragment.is_in(B_list):
+				#modify current interaction
+				if my_polarity:
+					#A is shown
+					if other_polarity:
+						print("#(+A)(+B)")
+						var neg = intersect_overlaps(fragment, other_fragment)
+						var pos = clip_overlaps(fragment, other_fragment)
+						#check if neg is false
+						if neg.empty():
+							#remove this overlap from the node 
+							#We revert positive parity nodes and delete negative ones
+							fragment.stop_overlap[B_list]
+						#modify the node's shapes
+						modify_pol_frags(fragment, pos)
+					else:
+						print("#(+A)(-B) = nothing to do")
+				else:
+					#A is not shown
+					print("(-A)(+B/-B)")
+					var pos = intersect_overlaps(fragment, other_fragment)
+					var neg = clip_overlaps(fragment, other_fragment)
+					if pos.empty():
+						#remove this node entirely
+						remove_child(fragment)	
+						fragment.queue_free()
+					else:
+						#modify the node's shapes (even though they aren't seen)
+						modify_pol_frags(fragment, neg)
+			else:
+				print("IF OVERLAP DOESN'T EXIST")
+
+#logic handler for xor mechanic
+func _check_overlap_B(other_fragments, other_pos, id):
 	if id == identity:
 		
 		pass
-		#var overlap = Geometry2D.exclude_polygons(oc, dc)
-		
-func _check_overlap_B(vertices, pos, id):
-	if id == identity:
-		
-		pass
+
+
+#handlers for adding to collision dictionary
+func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
+	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
+	emit_signal("overlapping", other_shape_node.return_id(), identity)
+
+#handlers for adding to collision dictionary
+func _on_area_shape_exited(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
+	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
+	emit_signal("not_overlapping", other_shape_node.return_id(), identity)

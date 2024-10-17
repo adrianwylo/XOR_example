@@ -22,8 +22,10 @@ signal snap(id, mouse_pos)
 signal start_snap(grid_pos, id)
 
 #sends other shape's vertices and position, and current shape's id
-signal check_overlap_A(vertices, shape_position, shape_id)
-signal check_overlap_B(vertices, shape_position, shape_id)
+#A indicates the shape with the shape_id is on top
+#B indicates the shape with the shape_id is on bot
+signal check_overlap_A(other_vertices, other_shape_position, other_shape_id, shape_id)
+signal check_overlap_B(other_vertices, other_shape_position, other_shape_id, shape_id)
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -31,20 +33,24 @@ func _ready() -> void:
 
 # Checks for overlaps constantly
 func _process(delta: float) -> void:
-	if test == true and dragging == true:
+	if dragging == true:
+		#FOR NOW WE LOOK AT ALL COMPARISONS BUT IN FUTURE CAN LOOK AT ONLY 
+		#THE SHAPES THAT ARE INTERACTING WITH DRAGGED_CHILD
 		for child in other_children:
-			#find current shape values
-			#[0] = List of fragments:[(shape, parity, index)]
+			#the format of return_polygon_info():
+			#[0] = List of fragments: references to overlap instance nodes
 			#[1] = Position
-			#[2] = Identification
+			#[2] = Identification # (child index)
 			var oc = child.return_polygon_info()
 			var dc = dragged_child.return_polygon_info()
-			
-			#signal calc for oc
-			emit_signal("check_overlap_B", dc[0], dc[1], oc[2])
-			#signal calc for dc
-			emit_signal("check_overlap_A", oc[0], oc[1], dc[2])
-		test = false
+			#decides what to call between two shapes based on indexing
+			assert(dc[2] != oc[2],"these pieces have no hierarchy")
+			if dc[2] > oc[2]:
+				emit_signal("check_overlap_A", oc[0], oc[1], oc[2], dc[2], )
+				emit_signal("check_overlap_B", dc[0], dc[1], dc[1], oc[2])
+			else:
+				emit_signal("check_overlap_A", dc[0], dc[1], dc[1], oc[2])
+				emit_signal("check_overlap_B", oc[0], oc[1], oc[2], dc[2])
 
 #create new instance of the playable_shape scene
 func shape_create(metadata, map) -> void:
@@ -54,20 +60,39 @@ func shape_create(metadata, map) -> void:
 	shape.connect("free_drag", _on_piece_free_drag)
 	shape.connect("occupy_drag", _on_piece_occupy_drag)
 	shape.connect("continue_q", _on_piece_continue_q)
+	shape.connect("overlapping", _on_piece_overlap)
+	shape.connect("no_overlapping", _on_piece_no_overlap)
 	add_child(shape)
+
+#signal from child that theres a collision
+func _on_piece_overlap(other_id: int, id: int):
+	if dragged_shape_id == id:
+		print(str(id) + " entered " + str(other_id))
+		other_children.append(get_child(other_id))
+	
+# Signal from child indicating there's no more collision
+func _on_piece_no_overlap(other_id: int, id: int):
+	if dragged_shape_id == id:
+		print(str(id) + " exited " + str(other_id))
+		var child = get_child(id)
+		if other_children.has(child):
+			other_children.erase(child) 
+			print("Child with id ", id, " removed from other_children")
+		else:
+			print("Error: Child with id ", id, " not found in other_children")
 
 #ack function picking a piece
 func _on_piece_occupy_drag(id) -> void:
 	if dragging == false and dragged_shape_id == -1:
+		#id's are the same as indexes because they don't change
 		dragged_shape_id = id
-		dragging = true
-		#populate other_children for collision detection
 		dragged_child = get_child(dragged_shape_id)
-		var all_children = get_children()
+		
+		#populate other_children for collision detection
+		#redeclaration clears it 
 		other_children = []
-		for i in range(all_children.size()):
-			if i != dragged_shape_id and i != 0:
-				other_children.append(all_children[i])
+		#turn on flag for going
+		dragging = true
 		emit_signal("go", id)
 	else:
 		print("occupied by " + str(dragged_shape_id) + ", " + str(id) + " cannot move")
