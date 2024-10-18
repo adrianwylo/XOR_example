@@ -27,24 +27,56 @@ signal start_snap(grid_pos, id)
 signal check_overlap_A(other_vertices, other_shape_position, other_shape_id, shape_id)
 signal check_overlap_B(other_vertices, other_shape_position, other_shape_id, shape_id)
 
+#for testing purposes
+@onready var timer = $testTimer
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	pass # Replace with function body.
+	# Start the timer with 10 seconds interval for testing purposes
+	timer.wait_time = 5
+	timer.start()
 
-# Checks for overlaps constantly
-func _process(delta: float) -> void:
+func _on_test_timer_timeout() -> void:
+	print("\nbeen 5 sec")
 	if dragging == true:
-		#FOR NOW WE LOOK AT ALL COMPARISONS BUT IN FUTURE CAN LOOK AT ONLY 
-		#THE SHAPES THAT ARE INTERACTING WITH DRAGGED_CHILD
-		for child in other_children:
+		for other_id in other_children:
 			#the format of return_polygon_info():
 			#[0] = List of fragments: references to overlap instance nodes
 			#[1] = Position
 			#[2] = Identification # (child index)
-			var oc = child.return_polygon_info()
+			var oc = other_children[other_id].return_polygon_info()
 			var dc = dragged_child.return_polygon_info()
-			#decides what to call between two shapes based on indexing
+			
+			assert(other_id == oc[2], "mismatch in id's for oc")
+			assert(dragged_shape_id == dc[2], "mismatch in id's for dc")
 			assert(dc[2] != oc[2],"these pieces have no hierarchy")
+			
+			#decides what to call between two shapes based on indexing
+			if dc[2] > oc[2]:
+				print("dragged is on top")
+				emit_signal("check_overlap_A", oc[0], oc[1], oc[2], dc[2], )
+				emit_signal("check_overlap_B", dc[0], dc[1], dc[2], oc[2])
+			else:
+				print("dragged is on bot")
+				emit_signal("check_overlap_A", dc[0], dc[1], dc[2], oc[2])
+				emit_signal("check_overlap_B", oc[0], oc[1], oc[2], dc[2])
+
+# Calculates overlaps constantly and changes views
+func _process(delta: float) -> void:
+	return
+	if dragging == true:
+		for other_id in other_children:
+			#the format of return_polygon_info():
+			#[0] = List of fragments: references to overlap instance nodes
+			#[1] = Position
+			#[2] = Identification # (child index)
+			var oc = other_children[other_id].return_polygon_info()
+			var dc = dragged_child.return_polygon_info()
+			assert(other_id == oc[2], "mismatch in id's for oc")
+			assert(dragged_shape_id == dc[2], "mismatch in id's for dc")
+			assert(dc[2] != oc[2],"these pieces have no hierarchy")
+			
+			#decides what to call between two shapes based on indexing
 			if dc[2] > oc[2]:
 				emit_signal("check_overlap_A", oc[0], oc[1], oc[2], dc[2], )
 				emit_signal("check_overlap_B", dc[0], dc[1], dc[1], oc[2])
@@ -61,25 +93,30 @@ func shape_create(metadata, map) -> void:
 	shape.connect("occupy_drag", _on_piece_occupy_drag)
 	shape.connect("continue_q", _on_piece_continue_q)
 	shape.connect("overlapping", _on_piece_overlap)
-	shape.connect("no_overlapping", _on_piece_no_overlap)
+	shape.connect("not_overlapping", _on_piece_no_overlap)
 	add_child(shape)
 
 #signal from child that theres a collision
 func _on_piece_overlap(other_id: int, id: int):
 	if dragged_shape_id == id:
 		print(str(id) + " entered " + str(other_id))
-		other_children.append(get_child(other_id))
+		if not other_children.has(other_id):
+			other_children[other_id] = get_child(other_id)
+			print(str(other_id) + " added to other_children")
 	
 # Signal from child indicating there's no more collision
 func _on_piece_no_overlap(other_id: int, id: int):
 	if dragged_shape_id == id:
 		print(str(id) + " exited " + str(other_id))
 		var child = get_child(id)
-		if other_children.has(child):
-			other_children.erase(child) 
-			print("Child with id ", id, " removed from other_children")
+		# Signal from child indicating there's no more collision
+		# Check if the other_id exists in the dictionary
+		if other_children.has(other_id):
+			other_children.erase(other_id)
+			print("Child with other_id ", other_id, " removed from other_children")
 		else:
-			print("Error: Child with id ", id, " not found in other_children")
+			print("Error: Child with other_id ", other_id, " not found in other_children")
+
 
 #ack function picking a piece
 func _on_piece_occupy_drag(id) -> void:
@@ -90,7 +127,7 @@ func _on_piece_occupy_drag(id) -> void:
 		
 		#populate other_children for collision detection
 		#redeclaration clears it 
-		other_children = []
+		other_children = {}
 		#turn on flag for going
 		dragging = true
 		emit_signal("go", id)

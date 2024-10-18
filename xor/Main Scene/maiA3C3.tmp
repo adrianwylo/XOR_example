@@ -20,8 +20,6 @@ new_shape = ExtResource("1_1w1ic")
 
 [node name="Timer" type="Timer" parent="playable_pieces"]
 
-[node name="testTimer" type="Timer" parent="playable_pieces"]
-
 [node name="Solution" type="Node2D" parent="."]
 script = ExtResource("6_0c0vp")
 
@@ -35,5 +33,4 @@ script = ExtResource("6_0c0vp")
 [connection signal="snap_info" from="Grid_Pieces" to="playable_pieces" method="_on_grid_pieces_snap_info"]
 [connection signal="snap" from="playable_pieces" to="Grid_Pieces" method="_on_playable_pieces_snap"]
 [connection signal="timeout" from="playable_pieces/Timer" to="playable_pieces" method="_on_lock_timer_timeout"]
-[connection signal="timeout" from="playable_pieces/testTimer" to="playable_pieces" method="_on_test_timer_timeout"]
 [connection signal="create_pieces" from="Solution" to="playable_pieces" method="_on_solution_create_pieces"]
