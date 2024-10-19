@@ -4,14 +4,14 @@ extends Area2D
 var others_involved = []
 var polarity: bool
 
-#returns an array of polygons (in vertices form)
+#returns all fragments as an array of polygons (in vertices form)
 func ret_polygons():
 	var shapes = []
 	for child in get_children():
 		shapes.append(child.polygon)
 	return shapes
 
-#creates a display of some vertices
+#adds a new child as a fragment of overlap
 func add_polygon(vertices: Array):
 	# Create a new Polygon2D node
 	var polygon = Polygon2D.new()
@@ -41,7 +41,7 @@ func replace_polygon(polygons: Array):
 			add_polygon(polygon)
 	assert(no_pol == get_child_count(), "replace_polygon: array differs from children")
 
-#deletes polygon at highest index (of children and shapes)
+#deletes polygon at highest child index 
 func del_polygon():
 	var last_index = get_child_count() - 1
 	var last_polygon = get_child(last_index)
@@ -59,38 +59,46 @@ func set_polarity(visible: bool):
 		show()
 	else:
 		hide()
-		
 
-#returns others_involved
+#returns shapess involved in this overlap
 func show_overlap() -> Array:
 	return others_involved
 
-#adds the indexes in paramter to overlap
+#Checks other_indexes match others_involved
+#you can't just say B.indexes is in A, ,ust be B.indexes + B is in A
+func ids_match(other_indexes: Array) -> bool:
+	others_involved.sort()
+	other_indexes.sort() 
+	return others_involved == other_indexes
+
+#add more shapes involved in overlap
 func add_to_overlap(other_indexes: Array) -> void:
 	for index in other_indexes:
 		if index not in others_involved:
 			others_involved.append(index)
 	others_involved.sort()
 
-#Checks if the instance is an overlaying of ONLY id's listed in array
-#you can't just say B.indexes is in A, ,ust be B.indexes + B is in A
-func is_in(other_indexes: Array) -> bool:
-	others_involved.sort()
-	other_indexes.sort() 
-	return others_involved == other_indexes
+#initializes the list of overlapped shapes
+func set_overlap(indexes: Array) -> void:
+	indexes.sort()
+	others_involved = indexes
 
-#removes the shape ids in array from others_involved
-func stop_overlap(other_indexes: Array) -> void:
+#removes shapes involved in overlap
+func sub_from_overlap(other_indexes: Array) -> void:
 	others_involved = others_involved.filter(
 	func(id):
 		return not other_indexes.has(id)
 	)
 
-#initializes the list of overlapped shapes
-func set_overlaps(indexes: Array) -> void:
-	indexes.sort()
-	others_involved = indexes
+#DELETES THIS OVERLAP
+func delete_overlap():
+	# Clean up by removing all child polygons
+	for i in range(get_child_count()):
+		del_polygon()  # Deletes each child polygon
+	# Remove the overlap node itself from its parent
+	if get_parent():
+		get_parent().remove_child(self)
+	# Free the overlap node from memory
+	queue_free()
 
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass
+	

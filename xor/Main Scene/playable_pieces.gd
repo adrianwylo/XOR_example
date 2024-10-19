@@ -40,26 +40,23 @@ func _on_test_timer_timeout() -> void:
 	print("\nbeen 5 sec")
 	if dragging == true:
 		for other_id in other_children:
-			#the format of return_polygon_info():
-			#[0] = List of fragments: references to overlap instance nodes
-			#[1] = Position
-			#[2] = Identification # (child index)
+
 			var oc = other_children[other_id].return_polygon_info()
 			var dc = dragged_child.return_polygon_info()
 			
-			assert(other_id == oc[2], "mismatch in id's for oc")
-			assert(dragged_shape_id == dc[2], "mismatch in id's for dc")
-			assert(dc[2] != oc[2],"these pieces have no hierarchy")
+			assert(other_id == oc.my_id, "mismatch in id's for oc")
+			assert(dragged_shape_id == dc.my_id, "mismatch in id's for dc")
+			assert(dc.my_id != oc.my_id,"these pieces have no hierarchy")
 			
 			#decides what to call between two shapes based on indexing
-			if dc[2] > oc[2]:
+			if dc.my_id > oc.my_id:
 				print("dragged is on top")
-				emit_signal("check_overlap_A", oc[0], oc[1], oc[2], dc[2], )
-				emit_signal("check_overlap_B", dc[0], dc[1], dc[2], oc[2])
+				emit_signal("check_overlap_A", oc, dc.my_id, )
+				emit_signal("check_overlap_B", dc, oc.my_id)
 			else:
 				print("dragged is on bot")
-				emit_signal("check_overlap_A", dc[0], dc[1], dc[2], oc[2])
-				emit_signal("check_overlap_B", oc[0], oc[1], oc[2], dc[2])
+				emit_signal("check_overlap_A", dc, oc.my_id)
+				emit_signal("check_overlap_B", oc, dc.my_id)
 
 # Calculates overlaps constantly and changes views
 func _process(delta: float) -> void:

@@ -2,6 +2,8 @@ extends Area2D
 
 # Reference to the 2D nodes:
 @onready var base_col2d = $click_col2d
+@onready var aware_col2d = $aware_col2d
+@onready var base_pol2d = $base_pol2d
 @export var new_poly: PackedScene
 
 #parent node for signal management:
@@ -23,6 +25,8 @@ var br_pos
 var identity
 #packaged vertices for polygon definition
 var packed_vertices
+#converted vertices for orignal
+var base_shape_vertices
 
 #current metadata 
 var grid_coor
@@ -34,9 +38,9 @@ var snapping = false
 var mouse_offset
 #target for linear interpolation
 var snap_target
-#list of references to visible_pieces (and invisible ones) 
+#list of references to overlaps 
 var overlaps
-#to access position (pxls) just use position
+
 
 #MAPPING
 var map
@@ -54,6 +58,21 @@ var snap_speed = 10
 var area_offset
 #metadata from click instance
 var click_event
+
+#class for polygon metadata
+class poly_metadata:
+	var my_id: int
+	#list of overlaps
+	var list_of_overlaps: Array
+	var my_position: Vector2i
+	#list of vertices
+	var my_base_shape: Array
+	
+	func _init(id: int, overlaps_list: Array, my_pos: Vector2, base: Array):
+		my_id = id
+		list_of_overlaps = overlaps_list
+		my_position = my_pos
+		my_base_shape = base
 
 # Returns shape ID for collision identification
 func return_id():
@@ -95,13 +114,20 @@ func _ready() -> void:
 	screen_size = get_viewport_rect().size
 	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
 	
-	#NOTE the coordinates passsed in here are relative to the position already
-	var base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
+	#initialize tracking of overlaps
 	overlaps = []
+	
 	# create base shape
-	create_new_overlap_node(true, base_shape_vertices,[])
+	#NOTE the coordinates passsed in here are relative to the position already
+	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
+	base_pol2d.polygon = base_shape_vertices
+	base_pol2d.modulate = Color(0, 0, 200)
+	
 	# create clickable collision
 	base_col2d.polygon = base_shape_vertices
+	
+	#blow up (might do later but if i implement this i have to add conditions for when there is no new node)
+	aware_col2d.polygon = base_shape_vertices
 
 #process passed metadata
 func pass_metadata(vertices: Array, tl: Vector2, br: Vector2) -> void:
@@ -162,17 +188,77 @@ func _process(delta: float) -> void:
 		position = position.clamp(Vector2.ZERO, screen_size - area_offset)
 
 #regurgitates collision2D's vertices + position
-func return_polygon_info() -> Array:
-	return [overlaps, position, identity]
+func return_polygon_info() -> poly_metadata:
+	var my_metadata = poly_metadata.new(identity,overlaps,position,base_col2d.polygon)
+	return my_metadata
 
+#redoing of intersect_polygon for overlaps (and their multiple polygons)
+func intersect_overlaps(a: Array, B_shapes: Array, A_pos: Vector2, B_pos: Vector2) -> Array:
+	assert(not B_shapes.is_empty(), "empty B (int)")
+	var final_intersect = []
+	var shifted_a = []
+	for vertex in a:
+		shifted_a.append(vertex+A_pos)
+	shifted_a = PackedVector2Array(shifted_a)
+	for b in B_shapes:
+		var shifted_b = []
+		for vertex in b:
+			shifted_b.append(vertex+B_pos)
+		shifted_b = PackedVector2Array(shifted_b)
+		var intersections = Geometry2D.intersect_polygons(shifted_a, shifted_b)
+		for intersection in intersections:
+			var shifted_poly = []
+			for vertex in intersection:
+				shifted_poly.append(vertex-A_pos)
+			final_intersect.append(shifted_poly)
+	print("final intersect is")
+	print(final_intersect)
+	return final_intersect
+
+#redoing of clip_polygon for overlaps (and their multiple polygons)
+func clip_overlaps(a: Array, B_shapes: Array, A_pos: Vector2, B_pos: Vector2) -> Array:
+	assert(not B_shapes.is_empty(), "empty B (int)")
+	var final_clip = []
+	var shifted_a = []
+	for vertex in a:
+		shifted_a.append(vertex+A_pos)
+	shifted_a = PackedVector2Array(shifted_a)
+	for b in B_shapes:
+		var shifted_b = []
+		for vertex in b:
+			shifted_b.append(vertex+B_pos)
+		shifted_b = PackedVector2Array(shifted_b)
+		var clipions = Geometry2D.clip_polygons(shifted_a, shifted_b)
+		for clipion in clipions:
+			var shifted_poly = []
+			for vertex in clipion:
+				shifted_poly.append(vertex-A_pos)
+			final_clip.append(shifted_poly)
+	print("final clip is")
+	print(final_clip)
+	return final_clip
+
+#function for adding child rep in overlaps
+func create_overlap(polarity: bool, polygons: Array,  involved_ids: Array = []):
+	print("\nmaking new node with:")
+	print(polygons)
+	print("for " + str(identity))
+	var new_overlap =  new_poly.instantiate()
+	for polygon in polygons:
+		new_overlap.add_polygon(polygon)
+	new_overlap.set_overlap(involved_ids)
+	new_overlap.set_polarity(polarity)
+	add_child(new_overlap)
+	overlaps.append(new_overlap)
+	
 #function for modifying the vertices of an show and its child representation
-func modify_pol_frags(overlap: Node, new_vertices: Array):
-	print("\nCalling modify_pol_frags ")
+func update_overlap(overlap: Node, new_vertices: Array):
+	print("\nCalling update_overlap ")
 	#IT IS IN HERE THAT WE HAVE TO FILTER OUT HOW TO READ FUNCTION OUTPUTS
 	
 	if new_vertices.size()<1:
 		#turn into assertion later
-		print("ALERT: no vertices in modify_pol_frags (should check the size before passing in here)")
+		print("ALERT: no vertices in update_overlap (should check the size before passing in here)")
 	overlap.replace_polygon(new_vertices)
 	
 	#delete for overhead
@@ -180,167 +266,120 @@ func modify_pol_frags(overlap: Node, new_vertices: Array):
 	print(new_vertices)
 	print(overlap.ret_polygons())
 
-#redoing of intersect_polygon for overlaps (amd their multiple polygons)
-func intersect_overlaps(A: Area2D, B: Area2D, A_pos: Vector2, B_pos: Vector2) -> Array:
-	var A_shapes = A.ret_polygons()
-	var B_shapes = B.ret_polygons()
-	print("\ncalling intersect_overlaps for A:")
-	#print(A_shapes)
-	#print("and B:")
-	#print(B_shapes)
-	assert(not A_shapes.is_empty(), "empty A (int)")
-	assert(not B_shapes.is_empty(), "empty B (int)")
-	var final_intersect = []
-	for a in A_shapes:
-		for b in B_shapes:
-			
-			var shifted_b = []
-			for vertex in b:
-				shifted_b.append(vertex+B_pos)				
-			shifted_b = PackedVector2Array(shifted_b)
-			
-			var shifted_a = []
-			for vertex in a:
-				shifted_a.append(vertex+A_pos)				
-			shifted_a = PackedVector2Array(shifted_a)
-			
-			var intersections = Geometry2D.intersect_polygons(shifted_a, shifted_b)
-			for intersection in intersections:
-				var shifted_poly = []
-				for vertex in intersection:
-					shifted_poly.append(vertex-A_pos)
-				final_intersect.append(shifted_poly)
-				
-	print("final intersect is")
-	print(final_intersect)
-	return final_intersect
+#removes overlap from child tree
+func remove_overlap(overlap: Node):
+	#take out of list
+	if overlap in overlaps:
+		overlaps.erase(overlap) 
+	#dequeue child
+	overlap.delete()
 
-#redoing of clip_polygon for overlaps (and their multiple polygons)
-func clip_overlaps(A: Area2D, B: Area2D, A_pos: Vector2, B_pos: Vector2) -> Array:
-	var A_shapes = A.ret_polygons()
-	var B_shapes = B.ret_polygons()
-	print("\ncalling clip_overlaps for A:")
-	#print(A_shapes)
-	#print("and B:")
-	#print(B_shapes)
-	#assert(not A_shapes.is_empty(), "empty A (clip)")
-	#assert(not B_shapes.is_empty(), "empty B (clip)")
-	var final_clip = []
-	for a in A_shapes:
-		for b in B_shapes:
-			var shifted_b = []
-			for vertex in b:
-				shifted_b.append(vertex+B_pos)				
-			shifted_b = PackedVector2Array(shifted_b)
-			
-			var shifted_a = []
-			for vertex in a:
-				shifted_a.append(vertex+A_pos)				
-			shifted_a = PackedVector2Array(shifted_a)
-			
-			var clips = Geometry2D.clip_polygons(shifted_a, shifted_b)
-			for clip in clips:
-				var shifted_poly = []
-				for vertex in clip:
-					shifted_poly.append(vertex-A_pos)
-				final_clip.append(shifted_poly)
-	print("final clip is")
-	print(final_clip)
-	return final_clip
-
-#function for adding child rep in overlaps
-func create_new_overlap_node(polarity: bool, new_vertices: Array,  involved_ids: Array = []):
-	print("\nmaking new node with:")
-	print(new_vertices)
-	var new_overlap =  new_poly.instantiate()
-	#make new vertices
-	new_overlap.add_polygon(new_vertices)
-	new_overlap.set_overlaps(involved_ids)
-	new_overlap.set_polarity(polarity)
-	if polarity:
-		print("Visible pol for " + str(identity))
-	else:
-		print("Invisible pol for " + str(identity))
-	#add child and add new overlap to overlaps
-	add_child(new_overlap)
-	overlaps.append(new_overlap)
-	
-
-#logic handler for xor mechanic when this shape is above
-func _check_overlap_A(other_overlaps, other_pos, other_id, id):
-	print("\ncheck_overlap_A for: A=" + str(id) + " and B=" +str(other_id))
+#logic handler for xor mechanic when this shape is above other one
+#NEED TO ADD CASES OF CHECKING WHEN THERE IS NO INTERACTION
+#THE WAY TO DO THAT IS DO COLLISION CHECKS WITH THE BLOWN UP SQUARE
+func _check_overlap_A(other_shape_metadata: poly_metadata, id: int):
 	if id != identity:
 		return
-	for other_overlap in other_overlaps:
-		var other_polarity = other_overlap.show_polarity
-		var B_list = other_overlap.show_overlap() 
-		B_list.append(other_id)
+	print("\ncheck_overlap_A for: A=" + str(id) + " and B=" +str(other_shape_metadata.my_id))
+	
+	#UNFORTUnately there is inbaked redundancy in this logic but should work for now
+	
+	#handles when there are no existing overlaps in other
+	if other_shape_metadata.list_of_overlaps.is_empty():
+		#create identifier for checking if this shape already is interacting with overlap
+		var B_list = [other_shape_metadata.my_id]
+		#search my_overlaps for B_list
+		var overlap_exists = false
+		#reference to overlap if it already exists
+		var existing_overlap_pos = null
+		var existing_overlap_neg = null
 		for overlap in overlaps:
-			var my_polarity = overlap.show_polarity
-			print("now look at a " + ("positive" if my_polarity else "negative") + " node for")
-			print(overlap.show_overlap())
-			#save list of involved ids in other node
-			if overlap.is_in(B_list):
-				#modify current interaction
-				if my_polarity:
-					#A is shown
-					if other_polarity:
-						print("#(+A)(+B) is in")
-						var neg = intersect_overlaps(overlap, other_overlap,position,other_pos)
-						var pos = clip_overlaps(overlap, other_overlap,position,other_pos)
-						#check if neg is false
-						if neg.is_empty():
-							#remove this overlap from the node 
-							#We revert positive parity nodes and delete negative ones
-							overlap.stop_overlap(B_list)
-						#modify the node's shapes
-						modify_pol_frags(overlap, pos)
-					#print("#(+A)(-B) = nothing to do")
+			if overlap.ids_match(B_list):
+				overlap_exists = true
+				if overlap.show_polarity():
+					existing_overlap_pos = overlap
 				else:
-					#A is not shown
-					print("(-A)(+B/-B) is in")
-					var pos = intersect_overlaps(overlap, other_overlap,position,other_pos)
-					var neg = clip_overlaps(overlap, other_overlap,position,other_pos)
-					if pos.is_empty():
-						#remove this node entirely
-						remove_child(overlap)	
-						overlap.queue_free()
-					else:
-						#modify the node's shapes (even though they aren't seen)
-						modify_pol_frags(overlap, neg)
+					existing_overlap_neg = overlap
+		
+		#these are the calcs no matter what
+		var inviz = intersect_overlaps(base_shape_vertices, [other_shape_metadata.my_base_shape], position, other_shape_metadata.my_position)
+		var viz = clip_overlaps(base_shape_vertices, [other_shape_metadata.my_base_shape], position, other_shape_metadata.my_position)
+		
+		#handles when there are existing overlaps in other
+		if overlap_exists:
+			#make sure we have both references
+			assert((existing_overlap_neg != null) and (existing_overlap_pos != null), 
+				   "Both overlaps cannot be null or both non-null.")
+			#check if there is no longer an overlap
+			if inviz.is_empty():
+				#delete the overlaps here
+				#we can purely delete here because we know that this is a pure one on one interaction
+				remove_overlap(existing_overlap_pos)
+				remove_overlap(existing_overlap_neg)
 			else:
-				if my_polarity:
-					#A is shown
-					if other_polarity:
-						print("#(+A)(+B) is new")
-						var neg = intersect_overlaps(overlap, other_overlap,position,other_pos)
-						var pos = clip_overlaps(overlap, other_overlap,position,other_pos)
-						#modify the positive overlap
-						modify_pol_frags(overlap, pos)
-						print("modified positive")
-						#must add B into the index list
-						overlap.add_to_overlap(B_list)
-
-						#create new neg node
-						create_new_overlap_node(false,neg,B_list)
-						print("created negative")
-						print("done with (+A)(+B) calc\n")
+				#modify the node's shapes
+				update_overlap(existing_overlap_neg, inviz)
+			#modify positive nonetheless
+			update_overlap(existing_overlap_pos, viz)
+		#must create a new overlap interaction (or test it at least)
+		else:
+			if not inviz.is_empty():
+				#create the instances of overlap
+				create_overlap(true,viz,B_list)
+				create_overlap(false,inviz,B_list)
+	#handles when there are existing overlaps in other
+	else:
+		for other_overlap in other_shape_metadata.list_of_overlaps:
+			#we only evaluate other_overlap with ourself if it is positive
+			if other_overlap.show_polarity() == false:
+				break
+				
+			#create identifier for checking if this shape already is interacting with overlap
+			var B_list = other_overlap.show_overlap() 
+			B_list.append(other_shape_metadata.my_id)
+			#search my_overlaps for B_list
+			var overlap_exists = false
+			var existing_overlap_pos = null
+			var existing_overlap_neg = null
+			for overlap in overlaps:
+				if overlap.ids_match(B_list):
+					overlap_exists = true
+					if overlap.show_overlap():
+						existing_overlap_pos = overlap
+					else:
+						existing_overlap_neg = overlap
+			
+			#these are the calcs no matter what
+			var inviz = intersect_overlaps(base_shape_vertices, other_overlap.ret_polygons(), position, other_shape_metadata.my_position)
+			var viz = clip_overlaps(base_shape_vertices, other_overlap.ret_polygons(), position, other_shape_metadata.my_position)
+			
+			#must modify current overlap
+			if overlap_exists:
+				#make sure we have both references
+				assert((existing_overlap_neg != null) and (existing_overlap_pos != null), 
+					   "Both overlaps cannot be null or both non-null.")
+				
+				#check if there is no longer an overlap
+				if inviz.is_empty():
+					#after some thinking i dont think this needs to be changed
+					remove_overlap(existing_overlap_pos)
+					remove_overlap(existing_overlap_neg)
 				else:
-					print("(-A)(+B/-B) is new")
-					var pos = intersect_overlaps(overlap, other_overlap,position,other_pos)
-					var neg = clip_overlaps(overlap, other_overlap,position,other_pos)
-					#modify the positive overlap
-					modify_pol_frags(overlap,neg)
-					#must add B into the index list
-					overlap.add_to_overlap(B_list)
-					#create new pos node
-					create_new_overlap_node(true,pos,B_list)
+					#modify the node's shapes
+					update_overlap(existing_overlap_neg, inviz)
+				#modify positive nonetheless
+				update_overlap(existing_overlap_pos, viz)
+			#must create a new overlap interaction (or test it at least)
+			else:
+				if not inviz.is_empty():
+					#create the instances of overlap
+					create_overlap(true,viz,B_list)
+					create_overlap(false,inviz,B_list)
 
 #logic handler for xor mechanic when this shape is below (adds a virtual mask to shapes)
-func _check_overlap_B(other_overlaps, other_pos, other_id, id):
-	print("check_overlap_B for: A=" + str(id) + " and B=" + str(other_id))
+func _check_overlap_B(other_shape_metadata: poly_metadata, id: int):
+	print("check_overlap_B for: A=" + str(id) + " and B=" + str(other_shape_metadata.my_id))
 	if id == identity:
-		
 		pass
 
 
