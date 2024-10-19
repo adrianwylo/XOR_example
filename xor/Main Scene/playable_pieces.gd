@@ -11,21 +11,116 @@ var dragging = false
 var dragged_shape_id = -1
 #reference to dragged child
 var dragged_child
-#List of other children that aren't dragged
-var other_children
 
-var test = false
+#an array of an array of indexes representing what has been overlapped
+#note that if A and B are connected, and B and C are connected
+#they are all found in the dictionary, but their list of connections won't list
+#anything they aren't connected to
+var overlap_groups
+class overlap:
+	#shapes involved in calculation
+	var indexes_involved: Dictionary
+	#shape chosen to display overlap
+	var display_index: int
+	
+	func _init(indexes: Array) -> void:
+		indexes_involved = {}
+		
+		#makes a dictionary that lists involved shapes and their collsions
+		for index in indexes:
+			var collisions = []
+			for collided_index in indexes:
+				if collided_index != index:
+					collisions.append(collided_index)
+			indexes_involved[str(index)] = collisions
+		
+		#recalc display_index
+		display_index = int(indexes_involved.keys()[0])
+		for key in indexes_involved.keys():
+			var int_key = int(key)
+			if int_key > int(display_index):
+				display_index = int_key
 
+	# Merge the current instance with another Overlap instance
+	func merge_with(other: overlap) -> void:
+		var cur_display_index = self.display_index
+		for other_index in other.indexes_involved:
+			#modify own entry
+			if self.indexes_involved.has(other_index):
+				for collision in other_index.indexes_involved[other_index]:
+					if collision not in self.indexes_involved[other_index]:
+						self.indexes_involved[other_index].append(collision)
+			#create new entry that is a transfer of other account
+			else:
+				if int(other_index) > cur_display_index:
+					self.display_index = int(other_index)
+				self.indexes_involved[other_index] = other_index.indexes_involved[other_index]
+	
+	#check if id is in overlap
+	func id_is_in_list(id: int) -> bool:
+		return indexes_involved.has(str(id))
+	
+	#add a specific collision to overlap
+	func add_id_to_list(new_id_1: int, new_id_2: int) -> void:
+		var cur_display_index = self.display_index
+		var found_1 = str(new_id_1) in indexes_involved.keys()
+		var found_2 = str(new_id_2) in indexes_involved.keys()
+		if found_1 and found_2:
+			if new_id_2 not in indexes_involved[str(new_id_1)]:
+				indexes_involved[str(new_id_1)].append(new_id_2)
+			if new_id_1 not in indexes_involved[str(new_id_2)]:
+				indexes_involved[str(new_id_2)].append(new_id_1)
+		elif found_1:
+			if new_id_2 not in indexes_involved[str(new_id_1)]:
+				indexes_involved[str(new_id_1)].append(new_id_2)
+			indexes_involved[str(new_id_2)] = [new_id_1]
+			if new_id_2 > cur_display_index:
+				display_index = new_id_2
+		elif found_2:
+			if new_id_1 not in indexes_involved[str(new_id_2)]:
+				indexes_involved[str(new_id_2)].append(new_id_1)
+			indexes_involved[str(new_id_1)] = [new_id_2]
+			if new_id_1 > cur_display_index:
+				display_index = new_id_1
+		else:
+			assert(found_1 or found_2, "can't add a connection if no id's are alr there")
+	
+	
+	#sever a specific collision from overlap
+	func sub_id_from_list(new_id_1: int, new_id_2: int) -> void:
+		var cur_display_index = self.display_index
+		var must_reevaluate = false
+		var found_1 = str(new_id_1) in indexes_involved.keys()
+		var found_2 = str(new_id_2) in indexes_involved.keys()
+		assert(found_1 and found_2, "can't remove a connection both id's are absent there")
+		#remove connections from 1
+		if new_id_2 in indexes_involved[str(new_id_1)]:
+			indexes_involved[str(new_id_1)].erase(new_id_2)
+			if indexes_involved[str(new_id_1)].is_empty():
+				indexes_involved.erase(str(new_id_1))
+				if cur_display_index == new_id_2:
+					must_reevaluate = true
+		#remove connections from 2
+		if new_id_1 in indexes_involved[str(new_id_2)]:
+			indexes_involved[str(new_id_2)].erase(new_id_1)
+			if indexes_involved[str(new_id_2)].is_empty():
+				indexes_involved.erase(str(new_id_2))
+				if cur_display_index == new_id_1:
+					must_reevaluate = true
+		
+		if must_reevaluate:
+			#recalc display_index
+			display_index = int(indexes_involved.keys()[0])
+			for key in indexes_involved.keys():
+				var int_key = int(key)
+				if int_key > int(display_index):
+					display_index = int_key
+		
+		
 #Ack signals for shapes
 signal go(id)
 signal snap(id, mouse_pos)
 signal start_snap(grid_pos, id)
-
-#sends other shape's vertices and position, and current shape's id
-#A indicates the shape with the shape_id is on top
-#B indicates the shape with the shape_id is on bot
-signal check_overlap_A(other_vertices, other_shape_position, other_shape_id, shape_id)
-signal check_overlap_B(other_vertices, other_shape_position, other_shape_id, shape_id)
 
 #for testing purposes
 @onready var timer = $testTimer
@@ -35,51 +130,16 @@ func _ready() -> void:
 	# Start the timer with 10 seconds interval for testing purposes
 	timer.wait_time = 5
 	timer.start()
+	overlap_groups = {}
 
 func _on_test_timer_timeout() -> void:
-	print("\nbeen 5 sec")
-	if dragging == true:
-		for other_id in other_children:
-
-			var oc = other_children[other_id].return_polygon_info()
-			var dc = dragged_child.return_polygon_info()
-			
-			assert(other_id == oc.my_id, "mismatch in id's for oc")
-			assert(dragged_shape_id == dc.my_id, "mismatch in id's for dc")
-			assert(dc.my_id != oc.my_id,"these pieces have no hierarchy")
-			
-			#decides what to call between two shapes based on indexing
-			if dc.my_id > oc.my_id:
-				print("dragged is on top")
-				emit_signal("check_overlap_A", oc, dc.my_id, )
-				emit_signal("check_overlap_B", dc, oc.my_id)
-			else:
-				print("dragged is on bot")
-				emit_signal("check_overlap_A", dc, oc.my_id)
-				emit_signal("check_overlap_B", oc, dc.my_id)
+	pass
+	
 
 # Calculates overlaps constantly and changes views
 func _process(delta: float) -> void:
 	return
-	if dragging == true:
-		for other_id in other_children:
-			#the format of return_polygon_info():
-			#[0] = List of fragments: references to overlap instance nodes
-			#[1] = Position
-			#[2] = Identification # (child index)
-			var oc = other_children[other_id].return_polygon_info()
-			var dc = dragged_child.return_polygon_info()
-			assert(other_id == oc[2], "mismatch in id's for oc")
-			assert(dragged_shape_id == dc[2], "mismatch in id's for dc")
-			assert(dc[2] != oc[2],"these pieces have no hierarchy")
-			
-			#decides what to call between two shapes based on indexing
-			if dc[2] > oc[2]:
-				emit_signal("check_overlap_A", oc[0], oc[1], oc[2], dc[2], )
-				emit_signal("check_overlap_B", dc[0], dc[1], dc[1], oc[2])
-			else:
-				emit_signal("check_overlap_A", dc[0], dc[1], dc[1], oc[2])
-				emit_signal("check_overlap_B", oc[0], oc[1], oc[2], dc[2])
+	
 
 #create new instance of the playable_shape scene
 func shape_create(metadata, map) -> void:
@@ -95,25 +155,51 @@ func shape_create(metadata, map) -> void:
 
 #signal from child that theres a collision
 func _on_piece_overlap(other_id: int, id: int):
-	if dragged_shape_id == id:
-		print(str(id) + " entered " + str(other_id))
-		if not other_children.has(other_id):
-			other_children[other_id] = get_child(other_id)
-			print(str(other_id) + " added to other_children")
+	var id_group_key = ""
+	var other_id_group_key = ""
 	
+	# Find group keys for both ids
+	for key in overlap_groups:
+		if overlap_groups[key].id_is_in_list(other_id):
+			other_id_group_key = key
+		if overlap_groups[key].id_is_in_list(id):
+			id_group_key = key
+
+	# Case 1: Neither ID is in any group, create a new group
+	if id_group_key == "" and other_id_group_key == "":
+		var key = ""
+		while overlap_groups.has(key) or key == "":
+			key = str(randi())  # Generate a random unique key
+		overlap_groups[key] = overlap.new([other_id, id])
+	
+	# Case 2: other_id is in a group, add id to it
+	elif id_group_key == "" and other_id_group_key != "":
+		overlap_groups[other_id_group_key].add_id_to_list(id)
+
+	# Case 3: id is in a group, add other_id to it
+	elif id_group_key != "" and other_id_group_key == "":
+		overlap_groups[id_group_key].add_id_to_list(other_id)
+
+	# Case 4: Both IDs are in different groups, merge the groups
+	else:
+		overlap_groups[id_group_key].merge_with(overlap_groups[other_id_group_key])
+		overlap_groups.erase(other_id_group_key)  # Remove the old group
+		
+
 # Signal from child indicating there's no more collision
 func _on_piece_no_overlap(other_id: int, id: int):
-	if dragged_shape_id == id:
-		print(str(id) + " exited " + str(other_id))
-		var child = get_child(id)
-		# Signal from child indicating there's no more collision
-		# Check if the other_id exists in the dictionary
-		if other_children.has(other_id):
-			other_children.erase(other_id)
-			print("Child with other_id ", other_id, " removed from other_children")
-		else:
-			print("Error: Child with other_id ", other_id, " not found in other_children")
-
+	var id_group_key = ""
+	var other_id_group_key = ""
+	
+	# Find group keys for both ids
+	for key in overlap_groups:
+		if overlap_groups[key].id_is_in_list(other_id):
+			other_id_group_key = key
+		if overlap_groups[key].id_is_in_list(id):
+			id_group_key = key
+	
+	# means that there is a connection to be severed
+	if other_id_group_key == id_group_key:
 
 #ack function picking a piece
 func _on_piece_occupy_drag(id) -> void:
@@ -122,9 +208,6 @@ func _on_piece_occupy_drag(id) -> void:
 		dragged_shape_id = id
 		dragged_child = get_child(dragged_shape_id)
 		
-		#populate other_children for collision detection
-		#redeclaration clears it 
-		other_children = {}
 		#turn on flag for going
 		dragging = true
 		emit_signal("go", id)
@@ -141,7 +224,7 @@ func _on_piece_free_drag(id, corner_pos) -> void:
 func _on_grid_pieces_snap_info(grid_pos: Variant) -> void:
 	emit_signal("start_snap", grid_pos, dragged_shape_id)
 
-# Reopen function for next piece picked
+# Reopen for next piece picked
 func _on_piece_continue_q(id) -> void:
 	if dragged_shape_id == id:
 		#gives time for snap so piece can't be taken
