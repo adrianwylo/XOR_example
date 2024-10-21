@@ -316,12 +316,12 @@ func map_shapes() -> void:
 											 Vector2(5,1)], 
 											 Vector2(5,0),
 											 Vector2(6,1)),
-					  playable_metadata.new([Vector2(5,0),
-											 Vector2(7,0),
-											 Vector2(7,2),
-											 Vector2(5,2)], 
-											 Vector2(5,0),
-											 Vector2(7,2))]
+					  playable_metadata.new([Vector2(0,5),
+											 Vector2(0,7),
+											 Vector2(2,7),
+											 Vector2(2,5)], 
+											 Vector2(0,5),
+											 Vector2(2,7))]
 					
 	for shape_areas in shape_areas:
 		#this it the top/leftmost corner of shape (does not have to be vertex)

@@ -23,16 +23,15 @@ func initialize_data(size_scale: float, length: float, grid_coordinate: Vector2i
 	var half_len = len_of_cell/2
 	grid_location = grid_coordinate
 	if !is_edge:
-		collision_array =  [Vector2(-half_len,-half_len),
-							Vector2(half_len,-half_len),
-							Vector2(half_len,half_len),
-							Vector2(-half_len,half_len),
-							Vector2(-half_len,-half_len)]
+		collision_array =  [Vector2i(-half_len,-half_len),
+							Vector2i(half_len,-half_len),
+							Vector2i(half_len,half_len),
+							Vector2i(-half_len,half_len)]
 
 func check_snap(corner_pos) -> void:
 	if Geometry2D.is_point_in_polygon(to_local(corner_pos), collision_shape.polygon):
 		#this is correct, but shouldnt be mouse_pos
-		print("closest to " + str(grid_location))
+		#print("closest to " + str(grid_location))
 		emit_signal("snap_found", grid_location)
 		
 

@@ -90,26 +90,26 @@ func return_base_and_pos() -> Dictionary:
 		"position": position
 	}
 	
-# Changes display of collisions
+# Processes incoming signals from playable_pieces over how display should function
 func _show_group(display_id: int, overlapping_children: Array):
 	var overlapping_ids = []
 	var children_shapes = {}
 	for child in overlapping_children:
 		overlapping_ids.append(child.return_id())
 		children_shapes[child.return_id()] = child.return_base_and_pos()
-	
 	#checks if this child is involved in group
 	if identity in overlapping_ids:
 		#checks if this child should display
 		is_in_group = true
 		if display_id == identity:
 			var overlap_shape = XOR_polygons(display_id, children_shapes)
+			print(overlap_shape)
 			display_overlap(overlap_shape)
 			is_display = true
 		else:
 			is_display = false
-			
 
+#handler for calling XOR calcs and displaying them with children
 func display_overlap(pol_list):
 	# Get the current child count excluding two specific children
 	var child_count = get_child_count() - 2
@@ -128,7 +128,7 @@ func display_overlap(pol_list):
 			# Create a new Polygon2D node for additional polygons
 			var polygon_node = Polygon2D.new()
 			polygon_node.polygon = vertices
-			polygon_node.modulate = Color(randf(),randf(),randf())
+			polygon_node.modulate =Color(0.541176, 0.168627, 0.886275, 1)
 			add_child(polygon_node)
 			polygon_node.show()
 	
@@ -138,8 +138,7 @@ func display_overlap(pol_list):
 			var child_node = get_child(i)
 			remove_child(child_node) 
 
-
-#modified XOR operation that works out how to manage holes
+#modified XOR operation between polygons that works out how to manage holes
 #note that both inputs must be polygons
 func XOR_processing(old_vertices: PackedVector2Array, new_vertices: PackedVector2Array) -> Array:
 	#individiually calculate each shape
@@ -157,7 +156,7 @@ func XOR_processing(old_vertices: PackedVector2Array, new_vertices: PackedVector
 	var ref_point
 	var closest_vertex
 	var closest_distance
-	var chosen_outline
+	var chosen_outline_index
 	
 	#adds holes to outlines
 	for hole in holes:
@@ -165,19 +164,19 @@ func XOR_processing(old_vertices: PackedVector2Array, new_vertices: PackedVector
 		ref_point = hole[0]
 		closest_vertex = outlines[0][0]
 		closest_distance = ref_point.distance_to(closest_vertex)
-		chosen_outline = outlines[0]
+		chosen_outline_index = 0
 		
 		#search for hole's outline
 		for outline in outlines:
 			for vertex in outline:
 				var new_distance = ref_point.distance_to(vertex)
 				if closest_distance > new_distance:
-					chosen_outline = outline
+					chosen_outline_index = outlines.find(outline)
 					closest_distance = new_distance
 					closest_vertex = vertex
 		
 		#modify outlines to include holes
-		chosen_outline = inject_hole(hole, chosen_outline, closest_vertex)
+		outlines[chosen_outline_index] = inject_hole(hole, outlines[chosen_outline_index], closest_vertex)
 	
 	#this is an array of packedvector2arrays(polygons)
 	return outlines
@@ -193,11 +192,9 @@ func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_
 		print("Error: closest_vertex not found in outline")
 		return outline
 	# Create a new array by slicing and inserting the hole
-	return outline.slice(0, injection_index + 1) + hole + outline.slice(injection_index + 1, outline.size())
+	return outline.slice(0, injection_index + 1) + hole + outline.slice(injection_index, outline.size())
 
-
-
-#Performs XOR operation on all children
+#Performs XOR operation on all children (TODO)
 func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 	#begin with display shape
 	var base_pos = children_shapes_data[display_id]["position"]
@@ -224,6 +221,7 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 		shifted_curr_XOR.append(shifted_shape)
 	return shifted_curr_XOR
 
+#called when discontinuing a collsion
 func _no_show_group(id):
 	if id == identity:
 		is_display = false
@@ -246,20 +244,21 @@ func _ready() -> void:
 	grid_coor = tl_pos
 	
 	# for movement bounds
-	screen_size = get_viewport_rect().size
+	screen_size = Vector2i(get_viewport_rect().size)
+	
 	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
 	
 	# create base shape
 	#NOTE the coordinates passsed in here are relative to the position already
 	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
 	base_pol2d.polygon = base_shape_vertices
-	base_pol2d.modulate = Color(randf(),randf(),randf())
+	base_pol2d.modulate = Color(1, 0.921569, 0.803922, 1)
 	
 	# create clickable collision
 	base_col2d.polygon = base_shape_vertices
 
 #process passed metadata
-func pass_metadata(vertices: Array, tl: Vector2, br: Vector2) -> void:
+func pass_metadata(vertices: Array, tl: Vector2i, br: Vector2i) -> void:
 	#assert(vertices.size() > 2, "not a shape")
 	packed_vertices = PackedVector2Array(vertices)
 	tl_pos = tl
@@ -270,7 +269,7 @@ func pass_map(pos_dic) -> void:
 	map = pos_dic
 
 # Converts a single vertex into pixel coordinates
-func coor_to_px(vertex: Vector2) -> Vector2:
+func coor_to_px(vertex: Vector2i) -> Vector2i:
 	var x_key = str(vertex.x)
 	var y_key = str(vertex.y)
 	assert(map.has(x_key), "x not found")
@@ -285,7 +284,6 @@ func pol_coor_to_px(vertices: PackedVector2Array, offset: Vector2) -> PackedVect
 		var new_pos = coor_to_px(vertex)-converted_offset
 		converted.append(new_pos)
 	return converted
-
 
 #MOVING PIECES FUNCTIONS--------------------------------------------------------
 #Click event handler
@@ -323,8 +321,9 @@ func snap_to_grid(grid_pos):
 	snap_target = coor_to_px(grid_pos)
 	snapping = true
 
-#clamps shape movement 
-func _process(delta: float) -> void:
+#clamps shape movement and modifies children
+func _physics_process(delta: float) -> void:
+	#display related -------------------------------------------------------------------------------
 	if is_in_group:
 		base_pol2d.hide()
 		if not is_display:
@@ -338,6 +337,7 @@ func _process(delta: float) -> void:
 		for i in range(get_child_count() - 1, 1, -1):  # Iterate backward to avoid index issues
 			var child_node = get_child(i)
 			remove_child(child_node)  # or child_node.queue_free() to free memory	
+	#interaction related ---------------------------------------------------------------------------
 	if snapping:
 		position = position.lerp(snap_target, snap_speed * delta)
 		if position.distance_to(snap_target) < 1.0:
@@ -353,5 +353,5 @@ func _process(delta: float) -> void:
 		var target_velocity = direction * max_speed
 		velocity = velocity.lerp(target_velocity, smooth_time * delta)
 		# Update the position based on the velocity
-		position += velocity * delta
+		position = get_global_mouse_position() + drag_offset
 		position = position.clamp(Vector2.ZERO, screen_size - area_offset)

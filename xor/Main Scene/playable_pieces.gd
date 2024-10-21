@@ -127,7 +127,6 @@ class overlap:
 		#check if the leftover dictionary is still connected
 		var dictionary_keys = need_to_split(indexes_involved)
 		if dictionary_keys.size() < indexes_involved.size():
-			print("need to populate return value")
 			var split_1 = {}
 			var split_2 = {}
 			for index in indexes_involved:
@@ -191,7 +190,7 @@ func find_key_with_id(id) -> int:
 			return key
 	return -1
 # Calculates overlaps constantly and changes views
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	for id in all_shapes:
 		var key = find_key_with_id(id)
 		if key != -1:
@@ -221,7 +220,6 @@ func shape_create(metadata, map) -> void:
 
 #signal from child that theres a collision
 func _on_piece_overlap(other_id: int, id: int):
-	print("overlapping " + str(other_id) + " and " + str(id))
 	var id_group_key = -1
 	var other_id_group_key = -1
 	
@@ -255,7 +253,6 @@ func _on_piece_overlap(other_id: int, id: int):
 	
 # Signal from child indicating there's no more collision
 func _on_piece_no_overlap(other_id: int, id: int):
-	print("not overlapping " + str(other_id) + " and " + str(id))
 	var id_group_key = -1
 	var other_id_group_key = -1
 	
@@ -313,7 +310,6 @@ func _on_piece_occupy_drag(id) -> void:
 
 #ack function for letting go of piece (requests grid nodes for info)
 func _on_piece_free_drag(id, corner_pos) -> void:
-	print(dragged_shape_id)
 	if dragged_shape_id == id:
 		emit_signal("snap", id, corner_pos)
 

@@ -46,16 +46,16 @@ func _on_main_init_grid(n_c, s_s, m_s) -> void:
 func create_grid() -> void:	
 	#counting margins, length of one side of grid
 	var grid_size_m = min(screen_size.x, screen_size.y)
-	var grid_offset = Vector2((screen_size.x - grid_size_m)/2, 
+	var grid_offset = Vector2i((screen_size.x - grid_size_m)/2, 
 							  (screen_size.y - grid_size_m)/2)
 	
 	#not counting margins, length of one side of full grid
 	var grid_size = grid_size_m * (1 - margin_size*2)
-	var margin_offset = Vector2(grid_size*margin_size, grid_size*margin_size)
+	var margin_offset = Vector2i(grid_size*margin_size, grid_size*margin_size)
 	
 	#changes position of grid
 	grid_offset += margin_offset
-	len_of_cell = grid_size/(node_count-1)
+	len_of_cell = int(grid_size/(node_count-1))
 	
 	#decide scale of nodes with reference to screen size
 	size_scale = 0.02#temp placeholder
@@ -66,8 +66,9 @@ func create_grid() -> void:
 		for y in range(0, node_count):
 			var is_edge = (x == node_count - 1 or y == node_count - 1)
 			#(- 1 because includes 2 divisions = 3 points)
-			var node_pos = len_of_cell * Vector2(x,y) + grid_offset
-			pos_dic[str(x)][str(y)] = Vector2i(node_pos.x, node_pos.y) 
+			var node_pos = len_of_cell * Vector2i(x,y) + grid_offset
+			pos_dic[str(x)][str(y)] = node_pos
+			
 			#create node as child
 			var node = new_node.instantiate()
 			node.connect("snap_found", _on_snap_found)
