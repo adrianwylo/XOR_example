@@ -67,7 +67,7 @@ func create_grid() -> void:
 			var is_edge = (x == node_count - 1 or y == node_count - 1)
 			#(- 1 because includes 2 divisions = 3 points)
 			var node_pos = len_of_cell * Vector2(x,y) + grid_offset
-			pos_dic[str(x)][str(y)] = node_pos
+			pos_dic[str(x)][str(y)] = Vector2i(node_pos.x, node_pos.y) 
 			#create node as child
 			var node = new_node.instantiate()
 			node.connect("snap_found", _on_snap_found)

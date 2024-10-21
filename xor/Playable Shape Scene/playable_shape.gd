@@ -3,7 +3,6 @@ extends Area2D
 # Reference to the 2D nodes:
 @onready var base_col2d = $click_col2d
 @onready var base_pol2d = $base_pol2d
-@onready var overlap_pol2d = $Overlap
 
 #parent node for signal management:
 var playable_pieces
@@ -38,6 +37,11 @@ var mouse_offset
 #target for linear interpolation
 var snap_target
 
+# if this is a display
+var is_display = false
+# if this shape is in a group
+var is_in_group = false
+
 #MAPPING
 var map
 #length of one grid unit in pxls
@@ -47,32 +51,223 @@ var grid_len
 # Size of the game window
 var screen_size 
 # Offset between mouse position and the object when dragging
-var drag_offset = Vector2() 
+var drag_offset
 # How fast piece move in snap to grid
 var snap_speed = 10 
 #for clamping
 var area_offset
 #metadata from click instance
 var click_event
+var max_speed: float = 400  # Set your desired maximum speed
+var smooth_time: float = 3   # Time to reach the target position
+var velocity: Vector2 = Vector2.ZERO  # Velocity to keep track of the current speed
 
-#class for polygon metadata
-class poly_metadata:
-	var my_id: int
-	#list of overlaps
-	var list_of_overlaps: Array
-	var my_position: Vector2i
-	#list of vertices
-	var my_base_shape: Array
-	
-	func _init(id: int, overlaps_list: Array, my_pos: Vector2, base: Array):
-		my_id = id
-		list_of_overlaps = overlaps_list
-		my_position = my_pos
-		my_base_shape = base
+#COLLISION INTERACTION FUNCTIONS------------------------------------------------
+#handlers for noting collision
+func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
+	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
+	emit_signal("overlapping", other_shape_node.return_id(), identity)
+
+#handlers for noting loss of collision
+func _on_area_shape_exited(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
+	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
+	emit_signal("not_overlapping", other_shape_node.return_id(), identity)
 
 # Returns shape ID for collision identification
-func return_id():
+func return_id() -> int:
 	return identity
+
+# Returns polygon and position for collision identification
+func return_base_and_pos() -> Dictionary:
+	#does the position conversion here to absolute coordinates
+	#for overlap calc
+	var abs_vertices = []
+	for vertex in base_pol2d.polygon:
+		abs_vertices.append(vertex+position)
+	return {
+		"base vertices": base_pol2d.polygon,
+		"abs base vertices": PackedVector2Array(abs_vertices),
+		"position": position
+	}
+	
+# Changes display of collisions
+func _show_group(display_id: int, overlapping_children: Array):
+	var overlapping_ids = []
+	var children_shapes = {}
+	for child in overlapping_children:
+		overlapping_ids.append(child.return_id())
+		children_shapes[child.return_id()] = child.return_base_and_pos()
+	
+	#checks if this child is involved in group
+	if identity in overlapping_ids:
+		#checks if this child should display
+		is_in_group = true
+		if display_id == identity:
+			var overlap_shape = XOR_polygons(display_id, children_shapes)
+			display_overlap(overlap_shape)
+			is_display = true
+		else:
+			is_display = false
+			
+
+func display_overlap(pol_list):
+	# Get the current child count excluding two specific children
+	var child_count = get_child_count() - 2
+	var no_pol = pol_list.size()
+	var child_index = 0
+		
+	# Iterate over the polygons in the list
+	for vertices in pol_list:
+		if child_index < child_count:
+			# Reuse existing polygon node
+			var polygon_node = get_child(child_index+2)
+			polygon_node.polygon = vertices
+			polygon_node.show()
+			child_index += 1
+		else:
+			# Create a new Polygon2D node for additional polygons
+			var polygon_node = Polygon2D.new()
+			polygon_node.polygon = vertices
+			polygon_node.modulate = Color(randf(),randf(),randf())
+			add_child(polygon_node)
+			polygon_node.show()
+	
+	# Hide extra children if there are more children than polygons
+	if child_count > no_pol:
+		for i in range(child_index, child_count, -1):
+			var child_node = get_child(i)
+			remove_child(child_node) 
+
+
+#modified XOR operation that works out how to manage holes
+#note that both inputs must be polygons
+func XOR_processing(old_vertices: PackedVector2Array, new_vertices: PackedVector2Array) -> Array:
+	#individiually calculate each shape
+	var holes = []
+	var outlines = []
+	var xor_outputs = Geometry2D.exclude_polygons(old_vertices, new_vertices)
+	
+	#categorize outputs
+	for xor_output in xor_outputs:
+		if Geometry2D.is_polygon_clockwise(xor_output):
+			holes.append(xor_output)
+		else:
+			outlines.append(xor_output)
+	
+	var ref_point
+	var closest_vertex
+	var closest_distance
+	var chosen_outline
+	
+	#adds holes to outlines
+	for hole in holes:
+		#makes the reference point first vertex in shape
+		ref_point = hole[0]
+		closest_vertex = outlines[0][0]
+		closest_distance = ref_point.distance_to(closest_vertex)
+		chosen_outline = outlines[0]
+		
+		#search for hole's outline
+		for outline in outlines:
+			for vertex in outline:
+				var new_distance = ref_point.distance_to(vertex)
+				if closest_distance > new_distance:
+					chosen_outline = outline
+					closest_distance = new_distance
+					closest_vertex = vertex
+		
+		#modify outlines to include holes
+		chosen_outline = inject_hole(hole, chosen_outline, closest_vertex)
+	
+	#this is an array of packedvector2arrays(polygons)
+	return outlines
+
+# Add hole to outline
+func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_vertex: Vector2) -> PackedVector2Array:
+	# Ensure the hole is closed by appending the first vertex to the end
+	hole.append(hole[0])
+	# Find the injection index based on the closest vertex
+	var injection_index = outline.find(closest_vertex)
+	if injection_index == -1:
+		# Handle case where closest_vertex is not found
+		print("Error: closest_vertex not found in outline")
+		return outline
+	# Create a new array by slicing and inserting the hole
+	return outline.slice(0, injection_index + 1) + hole + outline.slice(injection_index + 1, outline.size())
+
+
+
+#Performs XOR operation on all children
+func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
+	#begin with display shape
+	var base_pos = children_shapes_data[display_id]["position"]
+	var curr_XOR = [children_shapes_data[display_id]["abs base vertices"]]
+	
+	#reference to new polygon for XOR
+	var new_vertices
+	var new_current_XOR
+	#adding all new shapes
+	for index in children_shapes_data:
+		if index != display_id:
+			new_current_XOR = []
+			new_vertices = children_shapes_data[index]["abs base vertices"]
+			for polygon in curr_XOR:
+				new_current_XOR.append_array(XOR_processing(polygon, new_vertices))
+			curr_XOR = new_current_XOR
+	
+	#shift all polygons in current_XOR
+	var shifted_curr_XOR = []
+	for shape in curr_XOR:
+		var shifted_shape = []
+		for vertex in shape:
+			shifted_shape.append(vertex-base_pos)
+		shifted_curr_XOR.append(shifted_shape)
+	return shifted_curr_XOR
+
+func _no_show_group(id):
+	if id == identity:
+		is_display = false
+		is_in_group = false
+
+#INTITIALIZATION FUNCTIONS------------------------------------------------------
+#Called when the node enters the scene tree for the first time.
+func _ready() -> void:
+	#parent connections
+	playable_pieces = get_parent()
+	if playable_pieces:
+		playable_pieces.connect("go", _start_dragging)
+		playable_pieces.connect("start_snap", _stop_dragging)
+		playable_pieces.connect("display_group", _show_group)
+		playable_pieces.connect("no_display_group", _no_show_group)
+	identity = get_index()
+	
+	#track position
+	position = coor_to_px(tl_pos)
+	grid_coor = tl_pos
+	
+	# for movement bounds
+	screen_size = get_viewport_rect().size
+	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
+	
+	# create base shape
+	#NOTE the coordinates passsed in here are relative to the position already
+	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
+	base_pol2d.polygon = base_shape_vertices
+	base_pol2d.modulate = Color(randf(),randf(),randf())
+	
+	# create clickable collision
+	base_col2d.polygon = base_shape_vertices
+
+#process passed metadata
+func pass_metadata(vertices: Array, tl: Vector2, br: Vector2) -> void:
+	#assert(vertices.size() > 2, "not a shape")
+	packed_vertices = PackedVector2Array(vertices)
+	tl_pos = tl
+	br_pos = br
+
+#save map from coordinate to position
+func pass_map(pos_dic) -> void:
+	map = pos_dic
 
 # Converts a single vertex into pixel coordinates
 func coor_to_px(vertex: Vector2) -> Vector2:
@@ -91,44 +286,8 @@ func pol_coor_to_px(vertices: PackedVector2Array, offset: Vector2) -> PackedVect
 		converted.append(new_pos)
 	return converted
 
-#Called when the node enters the scene tree for the first time.
-func _ready() -> void:
-	#parent connections
-	playable_pieces = get_parent()
-	if playable_pieces:
-		playable_pieces.connect("go", _start_dragging)
-		playable_pieces.connect("start_snap", _stop_dragging)
-	identity = get_index()
-	
-	#track position
-	position = coor_to_px(tl_pos)
-	grid_coor = tl_pos
-	
-	# for movement bounds
-	screen_size = get_viewport_rect().size
-	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
-	
-	# create base shape
-	#NOTE the coordinates passsed in here are relative to the position already
-	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
-	base_pol2d.polygon = base_shape_vertices
-	base_pol2d.modulate = Color(0, 0, 200)
-	
-	# create clickable collision
-	base_col2d.polygon = base_shape_vertices
-	
 
-#process passed metadata
-func pass_metadata(vertices: Array, tl: Vector2, br: Vector2) -> void:
-	#assert(vertices.size() > 2, "not a shape")
-	packed_vertices = PackedVector2Array(vertices)
-	tl_pos = tl
-	br_pos = br
-
-#save map from coordinate to position
-func pass_map(pos_dic) -> void:
-	map = pos_dic
-
+#MOVING PIECES FUNCTIONS--------------------------------------------------------
 #Click event handler
 func _input(event: InputEvent) -> void:
 	click_event = event
@@ -166,67 +325,33 @@ func snap_to_grid(grid_pos):
 
 #clamps shape movement 
 func _process(delta: float) -> void:
+	if is_in_group:
+		base_pol2d.hide()
+		if not is_display:
+			# Remove all children except for node 0 and node 1
+			for i in range(get_child_count() - 1, 1, -1):  # Iterate backward to avoid index issues
+				var child_node = get_child(i)
+				remove_child(child_node)  # or child_node.queue_free() to free memory
+	else:
+		base_pol2d.show()
+		# Remove all children except for node 0 and node 
+		for i in range(get_child_count() - 1, 1, -1):  # Iterate backward to avoid index issues
+			var child_node = get_child(i)
+			remove_child(child_node)  # or child_node.queue_free() to free memory	
 	if snapping:
 		position = position.lerp(snap_target, snap_speed * delta)
 		if position.distance_to(snap_target) < 1.0:
 			position = snap_target
 			snapping = false  # Stop snapping after reaching the target
 	if dragging:
-		position = get_global_mouse_position() + drag_offset
+		var target_position = get_global_mouse_position() + drag_offset
+		target_position = target_position.clamp(Vector2.ZERO, screen_size - area_offset)
+		
+		# Calculate the desired movement towards the target position
+		var direction = (target_position - position).normalized()  # Get the direction
+		var distance = position.distance_to(target_position)
+		var target_velocity = direction * max_speed
+		velocity = velocity.lerp(target_velocity, smooth_time * delta)
+		# Update the position based on the velocity
+		position += velocity * delta
 		position = position.clamp(Vector2.ZERO, screen_size - area_offset)
-
-#redoing of intersect_polygon for overlaps (and their multiple polygons)
-func intersect_overlaps(a: Array, B_shapes: Array, A_pos: Vector2, B_pos: Vector2) -> Array:
-	assert(not B_shapes.is_empty(), "empty B (int)")
-	var final_intersect = []
-	var shifted_a = []
-	for vertex in a:
-		shifted_a.append(vertex+A_pos)
-	shifted_a = PackedVector2Array(shifted_a)
-	for b in B_shapes:
-		var shifted_b = []
-		for vertex in b:
-			shifted_b.append(vertex+B_pos)
-		shifted_b = PackedVector2Array(shifted_b)
-		var intersections = Geometry2D.intersect_polygons(shifted_a, shifted_b)
-		for intersection in intersections:
-			var shifted_poly = []
-			for vertex in intersection:
-				shifted_poly.append(vertex-A_pos)
-			final_intersect.append(shifted_poly)
-	print("final intersect is")
-	print(final_intersect)
-	return final_intersect
-
-#redoing of clip_polygon for overlaps (and their multiple polygons)
-func clip_overlaps(a: Array, B_shapes: Array, A_pos: Vector2, B_pos: Vector2) -> Array:
-	assert(not B_shapes.is_empty(), "empty B (int)")
-	var final_clip = []
-	var shifted_a = []
-	for vertex in a:
-		shifted_a.append(vertex+A_pos)
-	shifted_a = PackedVector2Array(shifted_a)
-	for b in B_shapes:
-		var shifted_b = []
-		for vertex in b:
-			shifted_b.append(vertex+B_pos)
-		shifted_b = PackedVector2Array(shifted_b)
-		var clipions = Geometry2D.clip_polygons(shifted_a, shifted_b)
-		for clipion in clipions:
-			var shifted_poly = []
-			for vertex in clipion:
-				shifted_poly.append(vertex-A_pos)
-			final_clip.append(shifted_poly)
-	print("final clip is")
-	print(final_clip)
-	return final_clip
-
-#handlers for adding to collision dictionary
-func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
-	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
-	emit_signal("overlapping", other_shape_node.return_id(), identity)
-
-#handlers for adding to collision dictionary
-func _on_area_shape_exited(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
-	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
-	emit_signal("not_overlapping", other_shape_node.return_id(), identity)
