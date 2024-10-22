@@ -321,6 +321,12 @@ func map_shapes() -> void:
 											 Vector2(2,7),
 											 Vector2(2,5)], 
 											 Vector2(0,5),
+											 Vector2(2,7)),
+					  playable_metadata.new([Vector2(0,5),
+											 Vector2(0,7),
+											 Vector2(2,7),
+											 Vector2(2,5)], 
+											 Vector2(0,5),
 											 Vector2(2,7))]
 					
 	for shape_areas in shape_areas:

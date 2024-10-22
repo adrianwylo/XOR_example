@@ -83,9 +83,9 @@ func return_base_and_pos() -> Dictionary:
 	#for overlap calc
 	var abs_vertices = []
 	for vertex in base_pol2d.polygon:
-		abs_vertices.append(Vector2i(vertex.x,vertex.y) +Vector2i(position.x,position.y))
+		abs_vertices.append(Vector2i(vertex.x,vertex.y) + Vector2i(position.x,position.y))
 	return {
-		"base vertices": base_pol2d.polygon,
+		#"base vertices": base_pol2d.polygon,
 		"abs base vertices": PackedVector2Array(abs_vertices),
 		"position": position
 	}
@@ -97,14 +97,14 @@ func _show_group(display_id: int, overlapping_children: Array):
 	for child in overlapping_children:
 		overlapping_ids.append(child.return_id())
 		children_shapes[child.return_id()] = child.return_base_and_pos()
-	#print("In this group for id:", identity, " the overlaps are ", overlapping_ids)
-	#print(display_id, " is the display")
+		
+	##key__-("In this group for id:", identity, " the overlaps are ", overlapping_ids)
+	##key__-(display_id, " is the display")
 	#checks if this child is involved in group
 	if identity in overlapping_ids:
 		#checks if this child should display
 		is_in_group = true
 		if display_id == identity:
-			print("this is children shapes ", children_shapes)
 			var overlap_shape = XOR_polygons(display_id, children_shapes)
 			display_overlap(overlap_shape)
 			is_display = true
@@ -113,7 +113,7 @@ func _show_group(display_id: int, overlapping_children: Array):
 
 #handler for displaying XOR calcs with children
 func display_overlap(pol_list):
-	#print("displaying overlap for ",pol_list)
+	##key__-("displaying overlap for ",pol_list)
 	# Get the current child count excluding two specific children
 	var child_count = get_child_count() - 2
 	var no_pol = pol_list.size()
@@ -136,15 +136,42 @@ func display_overlap(pol_list):
 			var child_node = get_child(i)
 			remove_child(child_node) 
 
+func shared_vertices(shape1: Array, shape2: Array) -> bool:
+	# Iterate over vertices in shape1
+	for vertex1 in shape1:
+		# Check if the vertex is also in shape2
+		for vertex2 in shape2:
+			if vertex2 == vertex1:
+				return true  # Shared vertex found
+	return false  # No shared vertices found
+
+func merge_polygons_test(shape1: PackedVector2Array, shape2: PackedVector2Array):
+	var processed_shape1 = PackedVector2Array()
+	var processed_shape2 = PackedVector2Array()
+	for vertex in shape1:
+		processed_shape1.append(Vector2(int(vertex.x), int(vertex.y)))
+	for vertex in shape2:
+		processed_shape2.append(Vector2(int(vertex.x), int(vertex.y)))
+	var answer = Geometry2D.merge_polygons(processed_shape1,processed_shape2)
+	##key__-(" \nevaling intersect for ",shape1, shape2)
+	#var nanswer = Geometry2D.intersect_polygons(processed_shape1,processed_shape2)
+	##key__-("here are the coordinates of test_intersect ", nanswer)
+	#
+	##key__-(" \nevaling xor for ",shape1, shape2)
+	#var nnanswer = XOR_processing(processed_shape1,processed_shape2)
+	##key__-("here are the coordinates of test_xor ", nnanswer)
+	return answer
+
 #Performs XOR operation on all children (TODO)
 func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 	#begin with display shape
+	#key__-(children_shapes_data)
 	var base_pos = children_shapes_data[display_id]["position"]
 	var curr_XOR = [children_shapes_data[display_id]["abs base vertices"]]
-	var curr_merge = [children_shapes_data[display_id]["abs base vertices"]]
-	print("NEW XOR CALC=============================")
-	print("finish xor'd ", display_id)
-	print("new curr_Xor = ", curr_XOR)
+	var curr_merge = children_shapes_data[display_id]["abs base vertices"]
+	#key__-("NEW XOR CALC=============================")
+	#key__-("finish xor'd ", display_id)
+	#key__-("new curr_Xor = ", curr_XOR)
 	#reference to new polygon for XOR
 	var new_vertices
 	var new_current_XOR
@@ -155,34 +182,44 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 	while true:
 		var all_shapes_checked = true 
 		#adding all new shapes
+		##key__-(children_shapes_data)
 		for index in children_shapes_data:
-			#get new values
-			new_vertices = children_shapes_data[index]["abs base vertices"]
-			#check if there is a collision between the polygons
-			var test_merge = Geometry2D.merge_polygons(curr_merge, new_vertices)
-			if test_merge.size()<2:
-				#do a calc and don't repeat it
-				if not processed_shapes.has(index):
-					print("new vertices = ", new_vertices)
-					#do calc
-					#update xor
-					#list of products from xor
-					new_current_XOR = []
-					for polygon in curr_XOR:
-						if Geometry2D.merge_polygons(polygon, new_vertices).size()<2:
-							#print("xoring ", polygon, " and ", new_vertices)
-							new_current_XOR.append_array(XOR_processing(polygon, new_vertices))
-					curr_XOR = new_current_XOR
-					print("finish xor'd ", index)
-					print("new curr_Xor = ", curr_XOR)
-					
-					#update merge
-					curr_merge = test_merge
-					#add index to the finished_list
-					processed_shapes.append(index)
-			else:
-				all_shapes_checked = false
+			if index != display_id:
+				#get new values
+				new_vertices = children_shapes_data[index]["abs base vertices"]
+				#check if there is a collision between the polygons
+				
+				var test_merge = merge_polygons_test(curr_merge, new_vertices)
+				if test_merge.size()<2 or is_corner(curr_merge, new_vertices): # checks if the current calc is touching (ADD OR THEY SHARE A POINT)
+					#do a calc and don't repeat it
+					#key__-("list of complete shapes for ",display_id," = ", processed_shapes, " and we're looking at ", index)
+					if not processed_shapes.has(index):
+						#key__-("new vertices = ", new_vertices)
+						#do calc
+						#update xor
+						#list of products from xor
+						new_current_XOR = []
+						for polygon in curr_XOR:
+							if (Geometry2D.merge_polygons(polygon, new_vertices).size()<2 and not is_corner(polygon, new_vertices)) or (not Geometry2D.merge_polygons(polygon, new_vertices).size()<2 and is_corner(polygon, new_vertices)):
+								#key__-("xoring ", polygon, " and ", new_vertices)
+								new_current_XOR.append_array(XOR_processing(polygon, new_vertices))
+							else:
+								#key__-("leaving ", polygon, " alone")
+								new_current_XOR.append(polygon)
+						curr_XOR = new_current_XOR
+						
+						
+						#key__-("finish xor'd ", index)
+						#key__-("new curr_Xor = ", curr_XOR)
+						
+						#update merge
+						curr_merge = test_merge
+						#add index to the finished_list
+						processed_shapes.append(index)
+				else:
+					all_shapes_checked = false
 		if all_shapes_checked == true:
+			#key__-(processed_shapes)
 			break
 	
 	#shift all polygons in current_XOR
@@ -192,6 +229,7 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 		for vertex in shape:
 			shifted_shape.append(vertex-base_pos)
 		shifted_curr_XOR.append(shifted_shape)
+	#key__-(shifted_curr_XOR, base_pos)
 	return shifted_curr_XOR
 
 #redoing of intersect_polygon for checking for redundant xors
@@ -213,8 +251,8 @@ func intersect_overlaps(a: Array, B_shapes: Array, A_pos: Vector2, B_pos: Vector
 			for vertex in intersection:
 				shifted_poly.append(vertex-A_pos)
 			final_intersect.append(shifted_poly)
-	print("final intersect is")
-	print(final_intersect)
+	#key__-("final intersect is")
+	#key__-(final_intersect)
 	return final_intersect
 
 
@@ -269,7 +307,7 @@ func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_
 	var injection_index = outline.find(closest_vertex)
 	if injection_index == -1:
 		# Handle case where closest_vertex is not found
-		print("Error: closest_vertex not found in outline")
+		#key__-("Error: closest_vertex not found in outline")
 		return outline
 	# Create a new array by slicing and inserting the hole
 	return outline.slice(0, injection_index + 1) + hole + outline.slice(injection_index, outline.size())
@@ -279,6 +317,20 @@ func _no_show_group(id):
 	if id == identity:
 		is_display = false
 		is_in_group = false
+
+func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
+	var shared_vertices = []
+	for vertex1 in shape1:
+		for vertex2 in shape2:
+			if vertex1 == vertex2:
+				shared_vertices.append(vertex1)
+	if shared_vertices.size() != 1:
+		return false
+	var excluded_polygons = Geometry2D.exclude_polygons(shape1, shape2)
+	if excluded_polygons.size() == 2:
+		#key__-("is corner")
+		return true
+	return false
 
 #INTITIALIZATION FUNCTIONS------------------------------------------------------
 #Called when the node enters the scene tree for the first time.
@@ -305,7 +357,7 @@ func _ready() -> void:
 	#NOTE the coordinates passsed in here are relative to the position already
 	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
 	base_pol2d.polygon = base_shape_vertices
-	base_pol2d.modulate = Color(randf(), randf(), randf())
+	base_pol2d.modulate = Color(1, 0, 0) 
 	
 	# create clickable collision a little smaller 
 	base_col2d.polygon = base_shape_vertices
@@ -349,8 +401,8 @@ func _input(event: InputEvent) -> void:
 		else:
 			if Geometry2D.is_point_in_polygon(to_local(event.position), base_col2d.polygon):
 				#request to start dragging
-				print()
-				print(str(identity) +" wants to move from grid index " + str(grid_coor))
+				#key__-()
+				#key__-(str(identity) +" wants to move from grid index " + str(grid_coor))
 				mouse_offset = event.position-position
 				emit_signal("occupy_drag", identity)
 
@@ -368,7 +420,7 @@ func _stop_dragging(grid_pos, id):
 		#processing of metadata from snap 
 		grid_coor = grid_pos
 		emit_signal("continue_q", identity)
-		print(str(identity) +" has stopped at grid index " + str(grid_coor))
+		#key__-(str(identity) +" has stopped at grid index " + str(grid_coor))
 
 #facilitates the animation of snapping to grid
 func snap_to_grid(grid_pos):
