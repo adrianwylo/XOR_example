@@ -58,8 +58,8 @@ var snap_speed = 10
 var area_offset
 #metadata from click instance
 var click_event
-var max_speed: float = 400  # Set your desired maximum speed
-var smooth_time: float = 3   # Time to reach the target position
+var max_speed: float = 250 # Set your desired maximum speed
+var smooth_factor: float = 0.1  # Time to reach the target position
 var velocity: Vector2 = Vector2.ZERO  # Velocity to keep track of the current speed
 
 #COLLISION INTERACTION FUNCTIONS------------------------------------------------
@@ -83,7 +83,7 @@ func return_base_and_pos() -> Dictionary:
 	#for overlap calc
 	var abs_vertices = []
 	for vertex in base_pol2d.polygon:
-		abs_vertices.append(vertex+position)
+		abs_vertices.append(Vector2i(vertex.x,vertex.y) +Vector2i(position.x,position.y))
 	return {
 		"base vertices": base_pol2d.polygon,
 		"abs base vertices": PackedVector2Array(abs_vertices),
@@ -97,46 +97,126 @@ func _show_group(display_id: int, overlapping_children: Array):
 	for child in overlapping_children:
 		overlapping_ids.append(child.return_id())
 		children_shapes[child.return_id()] = child.return_base_and_pos()
+	#print("In this group for id:", identity, " the overlaps are ", overlapping_ids)
+	#print(display_id, " is the display")
 	#checks if this child is involved in group
 	if identity in overlapping_ids:
 		#checks if this child should display
 		is_in_group = true
 		if display_id == identity:
+			print("this is children shapes ", children_shapes)
 			var overlap_shape = XOR_polygons(display_id, children_shapes)
-			print(overlap_shape)
 			display_overlap(overlap_shape)
 			is_display = true
 		else:
 			is_display = false
 
-#handler for calling XOR calcs and displaying them with children
+#handler for displaying XOR calcs with children
 func display_overlap(pol_list):
+	#print("displaying overlap for ",pol_list)
 	# Get the current child count excluding two specific children
 	var child_count = get_child_count() - 2
 	var no_pol = pol_list.size()
 	var child_index = 0
-		
+	
+	var children = get_children()
+	for i in range(2, len(children)):
+		children[i].queue_free()  # Remove the node at index i
 	# Iterate over the polygons in the list
 	for vertices in pol_list:
-		if child_index < child_count:
-			# Reuse existing polygon node
-			var polygon_node = get_child(child_index+2)
-			polygon_node.polygon = vertices
-			polygon_node.show()
-			child_index += 1
-		else:
-			# Create a new Polygon2D node for additional polygons
-			var polygon_node = Polygon2D.new()
-			polygon_node.polygon = vertices
-			polygon_node.modulate =Color(0.541176, 0.168627, 0.886275, 1)
-			add_child(polygon_node)
-			polygon_node.show()
+		var polygon_node = Polygon2D.new()
+		polygon_node.polygon = vertices
+		polygon_node.modulate = Color(randf(), randf(), randf())
+		add_child(polygon_node)
+		polygon_node.show()
 	
-	# Hide extra children if there are more children than polygons
+	
 	if child_count > no_pol:
 		for i in range(child_index, child_count, -1):
 			var child_node = get_child(i)
 			remove_child(child_node) 
+
+#Performs XOR operation on all children (TODO)
+func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
+	#begin with display shape
+	var base_pos = children_shapes_data[display_id]["position"]
+	var curr_XOR = [children_shapes_data[display_id]["abs base vertices"]]
+	var curr_merge = [children_shapes_data[display_id]["abs base vertices"]]
+	print("NEW XOR CALC=============================")
+	print("finish xor'd ", display_id)
+	print("new curr_Xor = ", curr_XOR)
+	#reference to new polygon for XOR
+	var new_vertices
+	var new_current_XOR
+	
+	#stack of processed shapes
+	var processed_shapes = [display_id]
+	#begin loop of xoring
+	while true:
+		var all_shapes_checked = true 
+		#adding all new shapes
+		for index in children_shapes_data:
+			#get new values
+			new_vertices = children_shapes_data[index]["abs base vertices"]
+			#check if there is a collision between the polygons
+			var test_merge = Geometry2D.merge_polygons(curr_merge, new_vertices)
+			if test_merge.size()<2:
+				#do a calc and don't repeat it
+				if not processed_shapes.has(index):
+					print("new vertices = ", new_vertices)
+					#do calc
+					#update xor
+					#list of products from xor
+					new_current_XOR = []
+					for polygon in curr_XOR:
+						if Geometry2D.merge_polygons(polygon, new_vertices).size()<2:
+							#print("xoring ", polygon, " and ", new_vertices)
+							new_current_XOR.append_array(XOR_processing(polygon, new_vertices))
+					curr_XOR = new_current_XOR
+					print("finish xor'd ", index)
+					print("new curr_Xor = ", curr_XOR)
+					
+					#update merge
+					curr_merge = test_merge
+					#add index to the finished_list
+					processed_shapes.append(index)
+			else:
+				all_shapes_checked = false
+		if all_shapes_checked == true:
+			break
+	
+	#shift all polygons in current_XOR
+	var shifted_curr_XOR = []
+	for shape in curr_XOR:
+		var shifted_shape = []
+		for vertex in shape:
+			shifted_shape.append(vertex-base_pos)
+		shifted_curr_XOR.append(shifted_shape)
+	return shifted_curr_XOR
+
+#redoing of intersect_polygon for checking for redundant xors
+func intersect_overlaps(a: Array, B_shapes: Array, A_pos: Vector2, B_pos: Vector2) -> Array:
+	assert(not B_shapes.is_empty(), "empty B (int)")
+	var final_intersect = []
+	var shifted_a = []
+	for vertex in a:
+		shifted_a.append(vertex+A_pos)
+	shifted_a = PackedVector2Array(shifted_a)
+	for b in B_shapes:
+		var shifted_b = []
+		for vertex in b:
+			shifted_b.append(vertex+B_pos)
+		shifted_b = PackedVector2Array(shifted_b)
+		var intersections = Geometry2D.intersect_polygons(shifted_a, shifted_b)
+		for intersection in intersections:
+			var shifted_poly = []
+			for vertex in intersection:
+				shifted_poly.append(vertex-A_pos)
+			final_intersect.append(shifted_poly)
+	print("final intersect is")
+	print(final_intersect)
+	return final_intersect
+
 
 #modified XOR operation between polygons that works out how to manage holes
 #note that both inputs must be polygons
@@ -194,33 +274,6 @@ func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_
 	# Create a new array by slicing and inserting the hole
 	return outline.slice(0, injection_index + 1) + hole + outline.slice(injection_index, outline.size())
 
-#Performs XOR operation on all children (TODO)
-func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
-	#begin with display shape
-	var base_pos = children_shapes_data[display_id]["position"]
-	var curr_XOR = [children_shapes_data[display_id]["abs base vertices"]]
-	
-	#reference to new polygon for XOR
-	var new_vertices
-	var new_current_XOR
-	#adding all new shapes
-	for index in children_shapes_data:
-		if index != display_id:
-			new_current_XOR = []
-			new_vertices = children_shapes_data[index]["abs base vertices"]
-			for polygon in curr_XOR:
-				new_current_XOR.append_array(XOR_processing(polygon, new_vertices))
-			curr_XOR = new_current_XOR
-	
-	#shift all polygons in current_XOR
-	var shifted_curr_XOR = []
-	for shape in curr_XOR:
-		var shifted_shape = []
-		for vertex in shape:
-			shifted_shape.append(vertex-base_pos)
-		shifted_curr_XOR.append(shifted_shape)
-	return shifted_curr_XOR
-
 #called when discontinuing a collsion
 func _no_show_group(id):
 	if id == identity:
@@ -252,10 +305,11 @@ func _ready() -> void:
 	#NOTE the coordinates passsed in here are relative to the position already
 	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
 	base_pol2d.polygon = base_shape_vertices
-	base_pol2d.modulate = Color(1, 0.921569, 0.803922, 1)
+	base_pol2d.modulate = Color(randf(), randf(), randf())
 	
-	# create clickable collision
+	# create clickable collision a little smaller 
 	base_col2d.polygon = base_shape_vertices
+
 
 #process passed metadata
 func pass_metadata(vertices: Array, tl: Vector2i, br: Vector2i) -> void:
@@ -281,7 +335,7 @@ func pol_coor_to_px(vertices: PackedVector2Array, offset: Vector2) -> PackedVect
 	var converted = PackedVector2Array()
 	var converted_offset = coor_to_px(offset)
 	for vertex in vertices:
-		var new_pos = coor_to_px(vertex)-converted_offset
+		var new_pos = coor_to_px(vertex) - converted_offset
 		converted.append(new_pos)
 	return converted
 
@@ -346,12 +400,5 @@ func _physics_process(delta: float) -> void:
 	if dragging:
 		var target_position = get_global_mouse_position() + drag_offset
 		target_position = target_position.clamp(Vector2.ZERO, screen_size - area_offset)
-		
-		# Calculate the desired movement towards the target position
-		var direction = (target_position - position).normalized()  # Get the direction
-		var distance = position.distance_to(target_position)
-		var target_velocity = direction * max_speed
-		velocity = velocity.lerp(target_velocity, smooth_time * delta)
-		# Update the position based on the velocity
-		position = get_global_mouse_position() + drag_offset
+		position = position.lerp(target_position, smooth_factor)
 		position = position.clamp(Vector2.ZERO, screen_size - area_offset)

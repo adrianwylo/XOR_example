@@ -37,8 +37,7 @@ func _ready() -> void:
 	assert(difficulty > 0 and difficulty < 6, "outside difficulty range!")
 	#create math behind correct solution and generates all pieces
 	emit_signal("init_solution", node_count, difficulty, map)
-	
-	
+
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
