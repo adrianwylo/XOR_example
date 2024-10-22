@@ -50,20 +50,6 @@ class overlap:
 			if int_key > int(display_index):
 				display_index = int_key
 
-	# Merge the current instance with another Overlap instance
-	func merge_with(other: overlap) -> void:
-		var cur_display_index = self.display_index
-		for other_index in other.indexes_involved:
-			#modify own entry
-			if self.indexes_involved.has(other_index):
-				for collision in other.indexes_involved[other_index]:
-					if collision not in self.indexes_involved[other_index]:
-						self.indexes_involved[other_index].append(collision)
-			#create new entry that is a transfer of other account
-			else:
-				if int(other_index) > cur_display_index:
-					self.display_index = int(other_index)
-				self.indexes_involved[other_index] = other_index.indexes_involved[other_index]
 	
 	#check if id is in overlap
 	func id_is_in_list(id: int) -> bool:
@@ -98,7 +84,7 @@ class overlap:
 	#creturns an empty array if nothing needs to be done
 	#returns the two separated dictionaries if there is something to be done
 	func sub_col_from_list(new_id_1: int, new_id_2: int) -> Array:
-		#key__-("running a subtraction")
+		print("running a subtraction")
 		var cur_display_index = self.display_index
 		var must_reevaluate = false
 		var found_1 =new_id_1 in indexes_involved.keys()
@@ -114,11 +100,11 @@ class overlap:
 		
 		#check if the leftover dictionary is still connected
 		var groupA = need_to_split(indexes_involved)
-		##key__-("pathfind result has ", groupA)
-		##key__-("original has ", indexes_involved)
+		#print("pathfind result has ", groupA)
+		#print("original has ", indexes_involved)
 		#check if this group size is lesser than list of all shapes
 		if groupA.size() < indexes_involved.size():
-			#key__-("must split up")
+			print("must split up")
 			#create two dictionaries of shape_ids and the shapes they connect to
 			var split_1 = {}
 			var split_2 = {}
@@ -129,7 +115,7 @@ class overlap:
 					split_2[index] = indexes_involved[index]
 			#if the split creates groups of one, the og group is erased
 			if split_1.size() == 1 and split_2.size() == 1:
-				#key__-("no more groups")
+				print("no more groups")
 				return [[]]
 			#if one of the split arrays is a group of one, the other replaces
 			#the og group
@@ -143,7 +129,7 @@ class overlap:
 					must_reevaluate = true
 			#return the new indexes_involved dictionaries for the current and new node
 			else:
-				#key__-("new group from split")
+				print("new group from split")
 				return [split_1, split_2]
 		#no changes in children have to happen
 		#readjustments after divide if there is no splitting in group
@@ -171,7 +157,7 @@ class overlap:
 	
 	#removes all the keys in the array from indexes_involved
 	func remove_indexes(indexes: Array) -> void:
-		#key__-("removed_indexes")
+		print("removed_indexes")
 		for key in indexes:
 			if key in indexes_involved:
 				indexes_involved.erase(key)
@@ -195,7 +181,7 @@ signal no_display_group(id)
 func _ready() -> void:
 	# Start the timer with 10 seconds interval for testing purposes
 	timer.wait_time = 5
-	#timer.start()
+	timer.start()
 	overlap_groups = {}
 	all_shapes = {}
 
@@ -207,25 +193,25 @@ func find_key_with_id(id) -> int:
 	return -1
 	
 #Calculates overlaps constantly and changes views
-func _physics_process(delta: float) -> void:
-	for id in all_shapes:
-		var key = find_key_with_id(id)
-		if key != -1:
-			var grouped_children = []
-			for index in overlap_groups[key].indexes_involved:
-				grouped_children.append(all_shapes[index])
-			emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
-			
-		else:
-			emit_signal("no_display_group", id)
+#func _physics_process(delta: float) -> void:
+	#for id in all_shapes:
+		#var key = find_key_with_id(id)
+		#if key != -1:
+			#var grouped_children = []
+			#for index in overlap_groups[key].indexes_involved:
+				#grouped_children.append(all_shapes[index])
+			#emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
+			#
+		#else:
+			#emit_signal("no_display_group", id)
 
 # debug rendition of process
 func _on_test_timer_timeout() -> void:
-	#key__-("\n\n\n NEW ROUND----------------------------------------------------")
+	print("\n\n\n NEW ROUND----------------------------------------------------")
 	for id in all_shapes:
 		var key = find_key_with_id(id)
 		if key != -1:
-			#key__-("\nindexes in group = ", overlap_groups[key].indexes_involved)
+			print("\nindexes in group = ", overlap_groups[key].indexes_involved)
 			var grouped_children = []
 			for index in overlap_groups[key].indexes_involved:
 				grouped_children.append(all_shapes[index])
@@ -276,11 +262,38 @@ func _on_piece_overlap(other_id: int, id: int):
 	elif id_group_key != -1 and other_id_group_key == -1:
 		overlap_groups[id_group_key].add_col_to_list(id,other_id)
 
-	# Case 4: Both IDs are in different groups, merge the groups
+	# Case 4: Both IDs are in different groups, merge the groups by creating a new one that represents all of them
 	elif id_group_key != other_id_group_key:
-		overlap_groups[id_group_key].merge_with(overlap_groups[other_id_group_key])
-		overlap_groups.erase(other_id_group_key)  # Remove the old group
-	
+		
+		var og_dic = overlap_groups[id_group_key].indexes_involved
+		var other_dic = overlap_groups[other_id_group_key].indexes_involved
+		var combined_dic = {}
+		# Merge og_dic
+		for index in og_dic:
+			if index not in combined_dic:
+				combined_dic[index] = []
+				for collision in og_dic[index]:
+					if collision not in combined_dic[index]:
+						combined_dic[index].append(collision)
+		
+		# Merge other_dic
+		for index in other_dic:
+			if index not in combined_dic:
+				combined_dic[index] = []
+				for collision in other_dic[index]:
+					if collision not in combined_dic[index]:
+						combined_dic[index].append(collision)
+		#gen key for new 
+		var key = -1
+		while overlap_groups.has(key) or key == -1:
+			key = randi()
+		overlap_groups[key] = overlap.new([],combined_dic)
+		# Remove the old and new group
+		overlap_groups.erase(id_group_key)
+		overlap_groups.erase(other_id_group_key)  
+
+			
+			
 # Signal from child indicating there's no more collision
 func _on_piece_no_overlap(other_id: int, id: int):
 	var id_group_key = -1
@@ -297,7 +310,7 @@ func _on_piece_no_overlap(other_id: int, id: int):
 	
 	# means that there is a connection to be severed
 	if other_id_group_key == id_group_key and id_group_key != -1:
-		#key__-("begin separating ", other_id, " and ", id)
+		print("begin separating ", other_id, " and ", id)
 		#for simplicity's sale
 		var old_key = id_group_key
 		var sep_vertices = overlap_groups[id_group_key].sub_col_from_list(other_id, id)
@@ -309,16 +322,15 @@ func _on_piece_no_overlap(other_id: int, id: int):
 			var new_key = -1
 			while overlap_groups.has(new_key) or new_key == -1:
 				new_key = randi() # Generate a random unique key
-			
-			#redefine old group by removing indexes in group 2
-			overlap_groups[new_key].remove_indexes(group_2)
-			
-			#create new group
+
 			var new_group_dic = {}
 			for index in group_2:
 				#repopulate new dic with group_2 entries
-				new_group_dic[index] = overlap_groups[index]
+				new_group_dic[index] = overlap_groups[old_key].indexes_involved[index]
 			overlap_groups[new_key] = overlap.new([], new_group_dic)
+			
+			#redefine old group by removing indexes in group 2
+			overlap_groups[old_key].remove_indexes(group_2.keys())
 			
 		#the group is empty after operation and must be removed from overlap_groups
 		elif sep_vertices.size() == 1:
@@ -335,7 +347,6 @@ func _on_piece_occupy_drag(id) -> void:
 		dragging = true
 		emit_signal("go", id)
 	
-		#key__-("occupied by " + str(dragged_shape_id) + ", " + str(id) + " cannot move")
 
 #ack function for letting go of piece (requests grid nodes for info)
 func _on_piece_free_drag(id, corner_pos) -> void:
