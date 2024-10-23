@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3 uid="uid://cm20ayafm2l7i"]
-
-[ext_resource type="Script" path="res://Playable Shape Scene/fragment/overlap.gd" id="1_tdfth"]
-
-[node name="overlap" type="Area2D"]
-script = ExtResource("1_tdfth")

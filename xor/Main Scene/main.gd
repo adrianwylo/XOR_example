@@ -39,9 +39,7 @@ func _ready() -> void:
 	emit_signal("init_solution", node_count, difficulty, map)
 
 
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass
+
 
 func _on_grid_pieces_grid_done(pos_dic: Variant) -> void:
 	grid_done = true

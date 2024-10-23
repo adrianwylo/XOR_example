@@ -206,7 +206,7 @@ func find_key_with_id(id) -> int:
 			#emit_signal("no_display_group", id)
 
 # debug rendition of process
-func _on_test_timer_timeout() -> void:
+func _on_test_timer_timeout() -> void: 
 	print("\n\n\n NEW ROUND----------------------------------------------------")
 	for id in all_shapes:
 		var key = find_key_with_id(id)
@@ -233,11 +233,30 @@ func shape_create(metadata, map) -> void:
 	add_child(shape)
 	all_shapes[get_child_count()-1] = shape
 
+#detects whether there is a phony collision
+func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
+	var shared_vertices = []
+	for vertex1 in shape1:
+		for vertex2 in shape2:
+			if vertex1 == vertex2:
+				shared_vertices.append(vertex1)
+	if shared_vertices.size() == 0:
+		return false
+	var excluded_polygons = Geometry2D.exclude_polygons(shape1, shape2)
+	if excluded_polygons.size() == 2:
+		return true
+	return false
+
 #signal from child that theres a collision
 func _on_piece_overlap(other_id: int, id: int):
 	var id_group_key = -1
 	var other_id_group_key = -1
 	
+	#check if the overlap is a bust
+	if is_corner(all_shapes[other_id].return_base_and_pos()["abs base vertices"], 
+				 all_shapes[id].return_base_and_pos()["abs base vertices"]):
+		print(other_id, "'s corners touch ", id)
+		return
 	
 	# Find group keys for both ids
 	for key in overlap_groups:

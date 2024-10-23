@@ -106,7 +106,8 @@ func _show_group(display_id: int, overlapping_children: Array):
 		is_in_group = true
 		if display_id == identity:
 			var overlap_shape = XOR_polygons(display_id, children_shapes)
-			display_overlap(overlap_shape)
+			if not overlap_shape.is_empty():
+				display_overlap(overlap_shape)
 			is_display = true
 		else:
 			is_display = false
@@ -145,23 +146,6 @@ func shared_vertices(shape1: Array, shape2: Array) -> bool:
 				return true  # Shared vertex found
 	return false  # No shared vertices found
 
-func merge_polygons_test(shape1: PackedVector2Array, shape2: PackedVector2Array):
-	var processed_shape1 = PackedVector2Array()
-	var processed_shape2 = PackedVector2Array()
-	for vertex in shape1:
-		processed_shape1.append(Vector2(int(vertex.x), int(vertex.y)))
-	for vertex in shape2:
-		processed_shape2.append(Vector2(int(vertex.x), int(vertex.y)))
-	var answer = Geometry2D.merge_polygons(processed_shape1,processed_shape2)
-	#print(" \nevaling intersect for ",shape1, shape2)
-	#var nanswer = Geometry2D.intersect_polygons(processed_shape1,processed_shape2)
-	#print("here are the coordinates of test_intersect ", nanswer)
-	#
-	#print(" \nevaling xor for ",shape1, shape2)
-	#var nnanswer = XOR_processing(processed_shape1,processed_shape2)
-	#print("here are the coordinates of test_xor ", nnanswer)
-	return answer
-
 #Performs XOR operation on all children (TODO)
 func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 	#begin with display shape
@@ -169,12 +153,9 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 	var base_pos = children_shapes_data[display_id]["position"]
 	var curr_XOR = [children_shapes_data[display_id]["abs base vertices"]]
 	var curr_merge = children_shapes_data[display_id]["abs base vertices"]
-	print("NEW XOR CALC=============================")
+	print(" NEW XOR CALC=============================")
 	print("finish xor'd ", display_id)
 	print("new curr_Xor = ", curr_XOR)
-	#reference to new polygon for XOR
-	var new_vertices
-	var new_current_XOR
 	
 	#stack of processed shapes
 	var processed_shapes = [display_id]
@@ -185,31 +166,87 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 		#print(children_shapes_data)
 		for index in children_shapes_data:
 			if index != display_id:
+				print("\nOPERATING ON NEW INDEX: ", index)
 				#get new values
-				new_vertices = children_shapes_data[index]["abs base vertices"]
+				var new_vertices = children_shapes_data[index]["abs base vertices"]
 				#check if there is a collision between the polygons
-				
-				var test_merge = merge_polygons_test(curr_merge, new_vertices)
-				if test_merge.size()<2 or is_corner(curr_merge, new_vertices): # checks if the current calc is touching (ADD OR THEY SHARE A POINT)
+				print(curr_merge, new_vertices)
+				var test_merge = Geometry2D.merge_polygons(curr_merge, new_vertices)
+				print("they share an edge: ",test_merge.size()<2 )
+				print("they share a corner: ", is_corner(curr_merge, new_vertices))
+				if test_merge.size()<2: # checks if the current calc is touching (ADD OR THEY SHARE A POINT)
 					#do a calc and don't repeat it
-					print("list of complete shapes for ",display_id," = ", processed_shapes, " and we're looking at ", index)
+					print(processed_shapes, " is operated against ", index)
 					if not processed_shapes.has(index):
 						print("new vertices = ", new_vertices)
 						#do calc
 						#update xor
 						#list of products from xor
-						new_current_XOR = []
-						for polygon in curr_XOR:
-							if (Geometry2D.merge_polygons(polygon, new_vertices).size()<2 and not is_corner(polygon, new_vertices)) or (not Geometry2D.merge_polygons(polygon, new_vertices).size()<2 and is_corner(polygon, new_vertices)):
-								print("xoring ", polygon, " and ", new_vertices)
-								new_current_XOR.append_array(XOR_processing(polygon, new_vertices))
-							else:
-								print("leaving ", polygon, " alone")
-								new_current_XOR.append(polygon)
+						var processed_merges = []
+						var unprocessed_corners = []
+						
+						#the merged shape that becomes indicator of whether polygon
+						#should create a calculation
+						var polygon_merger = new_vertices
+						#the expression of the xoring of above
+						var new_current_XOR = [new_vertices]
+						#loop through polygons to see how things should operate
+						#while true:
+						for i in range(2):
+							print("round ", i)
+							var merges_done = true
+							
+							for pol_index in range(curr_XOR.size()):
+								var polygon = curr_XOR[pol_index]
+								
+								print("\ntesting polygon index ", pol_index,": ", polygon, "\nwith new vertices:", new_current_XOR)
+								
+								#check if polygon touches new vertice
+								var new_pol_merge = Geometry2D.merge_polygons(polygon, polygon_merger)
+								print("polygon: ", polygon, "\npolygon_merger: ", polygon_merger)
+								print("they share an edge: ",new_pol_merge.size()<2 )
+								print("they share a corner: ", is_corner(polygon, polygon_merger))
+								if new_pol_merge.size()<2 and not is_corner(polygon, polygon_merger):
+									if pol_index not in processed_merges:
+										print("xoring ", polygon, " and ", new_vertices)
+										var xor_result = XOR_processing(polygon, new_vertices)
+										print("result is ", xor_result)
+										new_current_XOR = xor_result
+										
+										#updates checker for edge sharing
+										polygon_merger = new_pol_merge[0]
+										
+										#add polygon to the processed merges we see
+										processed_merges.append(pol_index)
+									else:
+										print('already merged')
+										merges_done = false
+								else:
+									if is_corner(polygon, polygon_merger):
+										if pol_index not in unprocessed_corners:
+											print("saving ", polygon, " as corner")
+											#queue polygon to be processed after all merges are processed
+											unprocessed_corners.append(pol_index)
+									else:
+										print('already merged put in corner list')
+										merges_done = false
+							
+							if merges_done == true:
+								print("\nhere are the standings for indexes covered")
+								print(processed_merges)
+								print(unprocessed_corners)
+								break
+										
+										
+						#iterate through the corners
+						print("what we have after merges: ", new_current_XOR)
+						
+						for corner_index in unprocessed_corners:
+							var corner_polygon = curr_XOR[corner_index]
+							print("appending index ",corner_index,": ", new_current_XOR)
+							new_current_XOR.append(corner_polygon)
 						curr_XOR = new_current_XOR
-						
-						
-						print("finish xor'd ", index)
+						print("FINISHED XOR:  ", index)
 						print("new curr_Xor = ", curr_XOR)
 						
 						#update merge
@@ -217,6 +254,8 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 						#add index to the finished_list
 						processed_shapes.append(index)
 				else:
+					#funcitons under assumption that when all shapes are gotten to, there will always
+					#be a merge or a corner check
 					all_shapes_checked = false
 		if all_shapes_checked == true:
 			print(processed_shapes)
@@ -324,15 +363,14 @@ func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
 		for vertex2 in shape2:
 			if vertex1 == vertex2:
 				shared_vertices.append(vertex1)
-	if shared_vertices.size() != 1:
+	if shared_vertices.size() == 0:
 		return false
 	var excluded_polygons = Geometry2D.exclude_polygons(shape1, shape2)
 	if excluded_polygons.size() == 2:
-		print("is corner")
 		return true
 	return false
 
-#INTITIALIZATION FUNCTIONS------------------------------------------------------
+#region Initialization Functions
 #Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	#parent connections
@@ -390,8 +428,9 @@ func pol_coor_to_px(vertices: PackedVector2Array, offset: Vector2) -> PackedVect
 		var new_pos = coor_to_px(vertex) - converted_offset
 		converted.append(new_pos)
 	return converted
+#endregion
 
-#MOVING PIECES FUNCTIONS--------------------------------------------------------
+#region Piece Move Functions
 #Click event handler
 func _input(event: InputEvent) -> void:
 	click_event = event
@@ -454,3 +493,4 @@ func _physics_process(delta: float) -> void:
 		target_position = target_position.clamp(Vector2.ZERO, screen_size - area_offset)
 		position = position.lerp(target_position, smooth_factor)
 		position = position.clamp(Vector2.ZERO, screen_size - area_offset)
+#endregion
