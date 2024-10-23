@@ -88,6 +88,17 @@ class overlap:
 		else:
 			assert(found_1 or found_2, "can't add a connection if no id's are alr there")
 	
+	#recalculates display_index with stipulation to ignor input
+	func recalc_display_wo(bad_index: int):
+		display_index = -1
+		for key in indexes_involved.keys():
+			var int_key = int(key)
+			if bad_index != int_key:
+				if int_key > int(display_index):
+					display_index = int_key
+		assert(display_index != -1, "this may not be a group")
+		
+	
 	#sever a specific collision from overlap
 	#creturns an empty array if nothing needs to be done
 	#returns the two separated dictionaries if there is something to be done
@@ -177,7 +188,6 @@ class overlap:
 
 #region Overlap Calcs
 #signal from child that theres a collision (TODO)
-
 func _on_piece_overlap(other_id: int, id: int):
 	#sdf("Test overlap of ", id, " and ", other_id)
 	var id_group_key = -1
@@ -366,9 +376,13 @@ func _ready() -> void:
 #region Action
 #Calculates overlaps constantly and changes views
 func _physics_process(delta: float) -> void:
+	
+	
 	for id in all_shapes:
 		var key = find_key_with_id(id)
 		if key != -1:
+			#update display indexes based on whether theres a shape being dragged:
+			overlap_groups[key].recalc_display_wo(dragged_shape_id)
 			var grouped_children = []
 			for index in overlap_groups[key].indexes_involved:
 				grouped_children.append(all_shapes[index])
