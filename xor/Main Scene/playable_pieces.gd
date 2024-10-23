@@ -180,7 +180,7 @@ signal no_display_group(id)
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# Start the timer with 10 seconds interval for testing purposes
-	timer.wait_time = 5
+	timer.wait_time = 8
 	timer.start()
 	overlap_groups = {}
 	all_shapes = {}
@@ -249,6 +249,7 @@ func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
 
 #signal from child that theres a collision
 func _on_piece_overlap(other_id: int, id: int):
+	print("Test overlap of ", id, " and ", other_id)
 	var id_group_key = -1
 	var other_id_group_key = -1
 	
@@ -267,6 +268,7 @@ func _on_piece_overlap(other_id: int, id: int):
 	
 	# Case 1: Neither ID is in any group, create a new group
 	if id_group_key == -1 and other_id_group_key == -1:
+		print("Case 1 for ", id, " and ", other_id)
 		var key = -1
 		while overlap_groups.has(key) or key == -1:
 			key = randi()
@@ -275,15 +277,17 @@ func _on_piece_overlap(other_id: int, id: int):
 	
 	# Case 2: other_id is in a group, add id to it
 	elif id_group_key == -1 and other_id_group_key != -1:
+		print("Case 2 for ", id, " and ", other_id)
 		overlap_groups[other_id_group_key].add_col_to_list(id,other_id)
 
 	# Case 3: id is in a group, add other_id to it
 	elif id_group_key != -1 and other_id_group_key == -1:
+		print("Case 3 for ", id, " and ", other_id)
 		overlap_groups[id_group_key].add_col_to_list(id,other_id)
 
 	# Case 4: Both IDs are in different groups, merge the groups by creating a new one that represents all of them
 	elif id_group_key != other_id_group_key:
-		
+		print("Case 4 for ", id, " and ", other_id)
 		var og_dic = overlap_groups[id_group_key].indexes_involved
 		var other_dic = overlap_groups[other_id_group_key].indexes_involved
 		var combined_dic = {}
@@ -302,6 +306,7 @@ func _on_piece_overlap(other_id: int, id: int):
 				for collision in other_dic[index]:
 					if collision not in combined_dic[index]:
 						combined_dic[index].append(collision)
+		
 		#gen key for new 
 		var key = -1
 		while overlap_groups.has(key) or key == -1:
@@ -310,7 +315,11 @@ func _on_piece_overlap(other_id: int, id: int):
 		# Remove the old and new group
 		overlap_groups.erase(id_group_key)
 		overlap_groups.erase(other_id_group_key)  
-
+	# Case 5: Both IDs are in same group, update index tables accordingly
+	else:
+		print("Case 5 for ", id, " and ", other_id)
+		overlap_groups[other_id_group_key].add_col_to_list(id,other_id)
+	print("===========================================\n")
 			
 			
 # Signal from child indicating there's no more collision
@@ -354,7 +363,7 @@ func _on_piece_no_overlap(other_id: int, id: int):
 		#the group is empty after operation and must be removed from overlap_groups
 		elif sep_vertices.size() == 1:
 			overlap_groups.erase(old_key)
-
+	print("===========================================")
 #ack function picking a piece
 func _on_piece_occupy_drag(id) -> void:
 	if dragging == false and dragged_shape_id == -1:
