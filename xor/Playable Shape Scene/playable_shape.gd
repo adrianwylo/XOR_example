@@ -70,21 +70,21 @@ var velocity: Vector2 = Vector2.ZERO  # Velocity to keep track of the current sp
 func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
 	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
 	var other_node_id = other_shape_node.return_id()
-	print("I'm connected to ", connected_node_id, " and i want to join ", other_node_id, "?")
-	if connected_node_id == -1:
-		connected_node_id = other_node_id
-		emit_signal("overlapping", other_node_id, identity)
+	#sdf("I'm connected to ", connected_node_id, " and i want to join ", other_node_id, "?")
+	#if connected_node_id == -1:
+		#connected_node_id = other_node_id
+	emit_signal("overlapping", other_node_id, identity)
 		
 
 #handlers for noting loss of collision
 func _on_area_shape_exited(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
 	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
 	var other_node_id = other_shape_node.return_id()
-	print("I'm connected to ", connected_node_id, " and i want to leave ", other_node_id, "?")
-	if connected_node_id == other_node_id:
+	#sdf("I'm connected to ", connected_node_id, " and i want to leave ", other_node_id, "?")
+	#if connected_node_id == other_node_id:
 		
-		emit_signal("not_overlapping",other_node_id , identity)
-		connected_node_id = -1
+	emit_signal("not_overlapping",other_node_id , identity)
+		#connected_node_id = -1
 		
 #endregion
 
@@ -118,7 +118,7 @@ func _show_group(display_id: int, overlapping_children: Array):
 		overlapping_ids.append(child.return_id())
 		children_shapes[child.return_id()] = child.return_base_and_pos()
 		
-	#print("In this group for id:", identity, " the overlaps are ", overlapping_ids)
+	##sdf("In this group for id:", identity, " the overlaps are ", overlapping_ids)
 	##sdf(display_id, " is the display")
 	#checks if this child is involved in group
 	if identity in overlapping_ids:
@@ -164,122 +164,33 @@ func _no_show_group(id):
 
 #Performs XOR operation on all children (TODO)
 func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
-	#begin with display shape
-	#sdf(children_shapes_data)
 	var base_pos = children_shapes_data[display_id]["position"]
-	var curr_XOR = [children_shapes_data[display_id]["abs base vertices"]]
-	var curr_merge = children_shapes_data[display_id]["abs base vertices"]
-	#sdf(" NEW XOR CALC=============================")
-	#sdf("finish xor'd ", display_id)
-	#sdf("new curr_Xor = ", curr_XOR)
-	
-	#stack of processed shapes
-	var processed_shapes = [display_id]
-	#begin loop of xoring
-	while true:
-		var all_shapes_checked = true 
-		#adding all new shapes
-		#{shape_id: {"position": pos_vector, "abs base vertices"" [shape]},......}
-		for index in children_shapes_data:
-			if index != display_id:
-				print("\nOPERATING ON NEW INDEX: ", index)
-				#get new values
-				var new_vertices = children_shapes_data[index]["abs base vertices"]
-				#check if there is a collision between the polygons
-				print("curr merge: ",curr_merge,"\nnew vertices: ", new_vertices, "\ncurr xor: ", curr_XOR)
-				var test_merge = Geometry2D.merge_polygons(curr_merge, new_vertices)
-				#sdf("they share an edge: ",test_merge.size()<2 )
-				#sdf("they share a corner: ", is_corner(curr_merge, new_vertices))
-				if test_merge.size()<2: # checks if the current calc is touching (ADD OR THEY SHARE A POINT)
-					#do a calc and don't repeat it
-					#sdf(processed_shapes, " is operated against ", index)
-					if not processed_shapes.has(index):
-						#sdf("new vertices = ", new_vertices)
-						#do calc
-						#update xor
-						#list of products from xor
-						var processed_merges = []
-						var unprocessed_corners = []
-						
-						#the merged shape that becomes indicator of whether polygon
-						#should create a calculation
-						var polygon_merger = new_vertices
-						#the expression of the xoring of above
-						var new_current_XOR = [new_vertices]
-						#loop through polygons to see how things should operate
-						while true:
-						#for i in range(2):
-							##sdf("round ", i)
-							var merges_done = true
-							
-							for pol_index in range(curr_XOR.size()):
-								var polygon = curr_XOR[pol_index]
-								
-								#sdf("\ntesting polygon index ", pol_index,": ", polygon, "\nwith new vertices:", new_current_XOR)
-								
-								#check if polygon touches new vertice
-								var new_pol_merge = Geometry2D.merge_polygons(polygon, polygon_merger)
-								#sdf("polygon: ", polygon, "\npolygon_merger: ", polygon_merger)
-								#sdf("they share an edge: ",new_pol_merge.size()<2 )
-								#sdf("they share a corner: ", is_corner(polygon, polygon_merger))
-								if new_pol_merge.size()<2 and not is_corner(polygon, polygon_merger):
-									if pol_index not in processed_merges:
-										print("xoring ", polygon, " (index ",pol_index,")", " and ", new_vertices)
-										var xor_result = XOR_processing(polygon, new_vertices)
-										print("result is ", xor_result)
-										new_current_XOR = xor_result
-										
-										#updates checker for edge sharing
-										polygon_merger = new_pol_merge[0]
-										
-										#add polygon to the processed merges we see
-										processed_merges.append(pol_index)
-									else:
-										print('already merged')
-										merges_done = false
-								else:
-									if is_corner(polygon, polygon_merger):
-										if pol_index not in unprocessed_corners:
-											print("saving ",polygon, " (index ",pol_index,")", " as corner")
-											#queue polygon to be processed after all merges are processed
-											unprocessed_corners.append(pol_index)
-									else:
-										print('already merged put in corner list')
-										merges_done = false
-							
-							if merges_done == true:
-								#sdf("\nhere are the standings for indexes covered")
-								#sdf(processed_merges)
-								#sdf(unprocessed_corners)
-								break
-										
-										
-						#iterate through the corners
-						#sdf("what we have after merges: ", new_current_XOR)
-						
-						for corner_index in unprocessed_corners:
-							var corner_polygon = curr_XOR[corner_index]
-							#sdf("appending index ",corner_index,": ", new_current_XOR)
-							new_current_XOR.append(corner_polygon)
-						curr_XOR = new_current_XOR
-						#sdf("FINISHED XOR:  ", index)
-						#sdf("new curr_Xor = ", curr_XOR)
-						
-						#update merge
-						curr_merge = test_merge
-						#add index to the finished_list
-						processed_shapes.append(index)
-						print("AFTER-OP:\n","curr merge: ",curr_merge,"\nnew vertices: ", new_vertices, "\ncurr xor: ", curr_XOR)
-						print()
-						
-				else:
-					#funcitons under assumption that when all shapes are gotten to, there will always
-					#be a merge or a corner check
-					all_shapes_checked = false
-		if all_shapes_checked == true:
-			#sdf(processed_shapes)
-			break
-	
+	var cutouts = {} #{index:[shape1, shape2...]
+	#create cutouts dictionary
+	for index in children_shapes_data:
+		cutouts[index] = children_shapes_data[index]["abs base vertices"]
+	#begin nested loop of xoring (clip_polygon)
+	#sdf("BEGIN XOR ===============", "\nCutouts = ", cutouts)
+	var curr_XOR = []
+	for index_cuttee in cutouts:
+		#make this a list because result of cut could be more
+		var new_cutouts: Array[PackedVector2Array] = []
+		new_cutouts.append(PackedVector2Array(cutouts[index_cuttee]))
+		
+		#per iteration over the cutter, the ammount of shapes to be "cut"
+		#will only grow (because a clipped shape can be divided into two
+		#thus the new cutouts are constantly updated as we go through the 
+		#indexes
+		for index_cutter in cutouts:
+			if index_cuttee != index_cutter:
+				#sdf(index_cuttee, " is cuttee and ",index_cutter, " is cutout")
+				#sdf(cutouts[index_cutter], "(always 1) cuts out ", new_cutouts, "(",new_cutouts.size(),") to get ")
+				new_cutouts = clip_all_polygons(new_cutouts, cutouts[index_cutter])
+				#sdf(new_cutouts)
+					
+		#append final cutouts to the current_XOR
+		curr_XOR.append_array(new_cutouts)
+	#sdf("\n", curr_XOR, " is ready to be shifted")
 	#shift all polygons in current_XOR
 	var shifted_curr_XOR = []
 	for shape in curr_XOR:
@@ -287,25 +198,57 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 		for vertex in shape:
 			shifted_shape.append(vertex-base_pos)
 		shifted_curr_XOR.append(shifted_shape)
-	#sdf(shifted_curr_XOR, base_pos)
+	#sdf("final shift: ", shifted_curr_XOR, base_pos)
 	return shifted_curr_XOR
+
+#returns a list of a shapes(a cut by a single cutter)
+func clip_all_polygons(cuttee_shapes: Array[PackedVector2Array], cutter: PackedVector2Array) -> Array[PackedVector2Array]:
+	#sdf("\nBegin clip_all")
+	var final_list: Array[PackedVector2Array] = []
+	for cuttee in cuttee_shapes:
+		#sdf("working with ", cutter, " cutting ", cuttee)
+		#if there is a single merge between cuts, clip should happen
+		if Geometry2D.merge_polygons(cuttee, cutter).size() == 1:
+			#sdf("there is an intersection, so clip is happening")
+			var new_cutout =  Geometry2D.clip_polygons(cuttee, cutter)
+			#sdf("clip result: ", new_cutout)
+			#assert(not new_cutout.is_empty(), "merge check has a flaw")
+			#check if the result is a hole
+			if new_cutout.size() > 1:
+				#process the two polygons into a hole
+				new_cutout = Hole_processing(new_cutout)
+				#sdf("processed holes: ", new_cutout)
+				for hole_cutout in new_cutout: 
+					final_list.append(PackedVector2Array(hole_cutout))
+			elif new_cutout.size() == 1:
+				#sdf("add the one")
+				#append the new 
+				final_list.append(PackedVector2Array(new_cutout[0]))
+			
+				
+		else:
+			#sdf("there is no intersection")
+			final_list.append(PackedVector2Array(cuttee))
+		#sdf("FINAL NOW: ",final_list)
+	return final_list
+		
+		
+		
 #endregion
 
-#region XOR hole manager
-#modified XOR operation between polygons that works out how to manage holes
+#region hole manager
+#manages multi packedvectorarray results from geo2d functions
 #note that both inputs must be polygons
-func XOR_processing(old_vertices: PackedVector2Array, new_vertices: PackedVector2Array) -> Array:
+func Hole_processing(clip_outputs: Array) -> Array:
 	#individiually calculate each shape
 	var holes = []
 	var outlines = []
-	var xor_outputs = Geometry2D.exclude_polygons(old_vertices, new_vertices)
-	
 	#categorize outputs
-	for xor_output in xor_outputs:
-		if Geometry2D.is_polygon_clockwise(xor_output):
-			holes.append(xor_output)
+	for clip_output in clip_outputs:
+		if Geometry2D.is_polygon_clockwise(clip_output):
+			holes.append(clip_output)
 		else:
-			outlines.append(xor_output)
+			outlines.append(clip_output)
 	
 	var ref_point
 	var closest_vertex
@@ -328,10 +271,8 @@ func XOR_processing(old_vertices: PackedVector2Array, new_vertices: PackedVector
 					chosen_outline_index = outlines.find(outline)
 					closest_distance = new_distance
 					closest_vertex = vertex
-		
 		#modify outlines to include holes
 		outlines[chosen_outline_index] = inject_hole(hole, outlines[chosen_outline_index], closest_vertex)
-	
 	#this is an array of packedvector2arrays(polygons)
 	return outlines
 

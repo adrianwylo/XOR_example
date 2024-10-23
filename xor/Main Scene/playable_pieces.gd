@@ -92,7 +92,7 @@ class overlap:
 	#creturns an empty array if nothing needs to be done
 	#returns the two separated dictionaries if there is something to be done
 	func sub_col_from_list(new_id_1: int, new_id_2: int) -> Array:
-		print("running a subtraction")
+		#sdf("running a subtraction")
 		var cur_display_index = self.display_index
 		var must_reevaluate = false
 		var found_1 =new_id_1 in indexes_involved.keys()
@@ -108,11 +108,11 @@ class overlap:
 		
 		#check if the leftover dictionary is still connected
 		var groupA = need_to_split(indexes_involved)
-		#print("pathfind result has ", groupA)
-		#print("original has ", indexes_involved)
+		##sdf("pathfind result has ", groupA)
+		##sdf("original has ", indexes_involved)
 		#check if this group size is lesser than list of all shapes
 		if groupA.size() < indexes_involved.size():
-			print("must split up")
+			#sdf("must split up")
 			#create two dictionaries of shape_ids and the shapes they connect to
 			var split_1 = {}
 			var split_2 = {}
@@ -123,7 +123,7 @@ class overlap:
 					split_2[index] = indexes_involved[index]
 			#if the split creates groups of one, the og group is erased
 			if split_1.size() == 1 and split_2.size() == 1:
-				print("no more groups")
+				#sdf("no more groups")
 				return [[]]
 			#if one of the split arrays is a group of one, the other replaces
 			#the og group
@@ -137,7 +137,7 @@ class overlap:
 					must_reevaluate = true
 			#return the new indexes_involved dictionaries for the current and new node
 			else:
-				print("new group from split")
+				#sdf("new group from split")
 				return [split_1, split_2]
 		#no changes in children have to happen
 		#readjustments after divide if there is no splitting in group
@@ -165,7 +165,7 @@ class overlap:
 	
 	#removes all the keys in the array from indexes_involved
 	func remove_indexes(indexes: Array) -> void:
-		print("removed_indexes")
+		#sdf("removed_indexes")
 		for key in indexes:
 			if key in indexes_involved:
 				indexes_involved.erase(key)
@@ -179,14 +179,14 @@ class overlap:
 #signal from child that theres a collision (TODO)
 
 func _on_piece_overlap(other_id: int, id: int):
-	print("Test overlap of ", id, " and ", other_id)
+	#sdf("Test overlap of ", id, " and ", other_id)
 	var id_group_key = -1
 	var other_id_group_key = -1
 	
 	#check if the overlap is a bust
 	if is_corner(all_shapes[other_id].return_base_and_pos()["abs base vertices"], 
 				 all_shapes[id].return_base_and_pos()["abs base vertices"]):
-		print(other_id, "'s corners touch ", id)
+		#sdf(other_id, "'s corners touch ", id)
 		return
 	
 	# Find group keys for both ids
@@ -198,28 +198,28 @@ func _on_piece_overlap(other_id: int, id: int):
 	
 	# Case 1: Neither ID is in any group, create a new group
 	if id_group_key == -1 and other_id_group_key == -1:
-		print("//Case 1 for ", id, " and ", other_id)
+		#sdf("//Case 1 for ", id, " and ", other_id)
 		var key = -1
 		while overlap_groups.has(key) or key == -1:
 			key = randi()
 		overlap_groups[key] = overlap.new([other_id, id])
-		print(overlap_groups[key].indexes_involved)
+		#sdf(overlap_groups[key].indexes_involved)
 	
 	# Case 2: other_id is in a group, add id to it
 	elif id_group_key == -1 and other_id_group_key != -1:
-		print("//Case 2 for ", id, " and ", other_id)
+		#sdf("//Case 2 for ", id, " and ", other_id)
 		overlap_groups[other_id_group_key].add_col_to_list(id,other_id)
-		print(overlap_groups[other_id_group_key].indexes_involved)
+		#sdf(overlap_groups[other_id_group_key].indexes_involved)
 
 	# Case 3: id is in a group, add other_id to it
 	elif id_group_key != -1 and other_id_group_key == -1:
-		print("//Case 3 for ", id, " and ", other_id)
+		#sdf("//Case 3 for ", id, " and ", other_id)
 		overlap_groups[id_group_key].add_col_to_list(id,other_id)
-		print(overlap_groups[id_group_key].indexes_involved)
+		#sdf(overlap_groups[id_group_key].indexes_involved)
 
 	# Case 4: Both IDs are in different groups, merge the groups by creating a new one that represents all of them
 	elif id_group_key != other_id_group_key:
-		print("//Case 4 for ", id, " and ", other_id)
+		#sdf("//Case 4 for ", id, " and ", other_id)
 		var og_dic = overlap_groups[id_group_key].indexes_involved
 		var other_dic = overlap_groups[other_id_group_key].indexes_involved
 		var combined_dic = {}
@@ -247,17 +247,17 @@ func _on_piece_overlap(other_id: int, id: int):
 		# Remove the old and new group
 		overlap_groups.erase(id_group_key)
 		overlap_groups.erase(other_id_group_key)  
-		print(overlap_groups[key].indexes_involved)
+		#sdf(overlap_groups[key].indexes_involved)
 	# Case 5: Both IDs are in same group, update index tables accordingly
 	else:
-		print("//Case 5 for ", id, " and ", other_id)
+		#sdf("//Case 5 for ", id, " and ", other_id)
 		overlap_groups[other_id_group_key].add_col_to_list(id,other_id)
-		print(overlap_groups[other_id_group_key].indexes_involved)
+		#sdf(overlap_groups[other_id_group_key].indexes_involved)
 			
 			
 # Signal from child indicating there's no more collision
 func _on_piece_no_overlap(other_id: int, id: int):
-	print("Test cease overlap of ", id, " and ", other_id)
+	#sdf("Test cease overlap of ", id, " and ", other_id)
 	var id_group_key = -1
 	var other_id_group_key = -1
 	
@@ -272,7 +272,7 @@ func _on_piece_no_overlap(other_id: int, id: int):
 	
 	# means that there is a connection to be severed
 	if other_id_group_key == id_group_key and id_group_key != -1:
-		print("begin separating ", other_id, " and ", id)
+		#sdf("begin separating ", other_id, " and ", id)
 		#for simplicity's sale
 		var old_key = id_group_key
 		var sep_vertices = overlap_groups[id_group_key].sub_col_from_list(other_id, id)
@@ -356,8 +356,8 @@ func shape_create(metadata, map) -> void:
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# Start the timer with 10 seconds interval for testing purposes
-	timer.wait_time = 8
-	timer.start()
+	timer.wait_time = 5
+	#timer.start()
 	overlap_groups = {}
 	all_shapes = {}
 
@@ -365,25 +365,25 @@ func _ready() -> void:
 
 #region Action
 #Calculates overlaps constantly and changes views
-#func _physics_process(delta: float) -> void:
-	#for id in all_shapes:
-		#var key = find_key_with_id(id)
-		#if key != -1:
-			#var grouped_children = []
-			#for index in overlap_groups[key].indexes_involved:
-				#grouped_children.append(all_shapes[index])
-			#emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
-			#
-		#else:
-			#emit_signal("no_display_group", id)
-
-# debug rendition of process
-func _on_test_timer_timeout() -> void: 
-	print("\n\n\n NEW ROUND----------------------------------------------------")
+func _physics_process(delta: float) -> void:
 	for id in all_shapes:
 		var key = find_key_with_id(id)
 		if key != -1:
-			print("\nindexes in group = ", overlap_groups[key].indexes_involved)
+			var grouped_children = []
+			for index in overlap_groups[key].indexes_involved:
+				grouped_children.append(all_shapes[index])
+			emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
+			
+		else:
+			emit_signal("no_display_group", id)
+
+# debug rendition of process
+func _on_test_timer_timeout() -> void: 
+	#sdf("\n\n\n NEW ROUND----------------------------------------------------")
+	for id in all_shapes:
+		var key = find_key_with_id(id)
+		if key != -1:
+			#sdf("\nindexes in group = ", overlap_groups[key].indexes_involved)
 			var grouped_children = []
 			for index in overlap_groups[key].indexes_involved:
 				grouped_children.append(all_shapes[index])
@@ -413,7 +413,7 @@ func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
 	var intersected_polygons = Geometry2D.intersect_polygons(shape1, shape2)
 	var merge_polygons =  Geometry2D.merge_polygons(shape1, shape2)
 	if intersected_polygons.size() == 0 and merge_polygons.size() == 2:
-		print("intersecsetwseef ",intersected_polygons)
+		#sdf("intersecsetwseef ",intersected_polygons)
 		return true
 	return false
 #endregion
