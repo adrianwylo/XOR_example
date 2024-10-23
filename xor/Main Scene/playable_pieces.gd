@@ -366,7 +366,7 @@ func shape_create(metadata, map) -> void:
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# Start the timer with 10 seconds interval for testing purposes
-	timer.wait_time = 5
+	timer.wait_time = 7
 	#timer.start()
 	overlap_groups = {}
 	all_shapes = {}
@@ -376,8 +376,6 @@ func _ready() -> void:
 #region Action
 #Calculates overlaps constantly and changes views
 func _physics_process(delta: float) -> void:
-	
-	
 	for id in all_shapes:
 		var key = find_key_with_id(id)
 		if key != -1:
@@ -398,6 +396,8 @@ func _on_test_timer_timeout() -> void:
 		var key = find_key_with_id(id)
 		if key != -1:
 			#sdf("\nindexes in group = ", overlap_groups[key].indexes_involved)
+			#update display indexes based on whether theres a shape being dragged:
+			overlap_groups[key].recalc_display_wo(dragged_shape_id)
 			var grouped_children = []
 			for index in overlap_groups[key].indexes_involved:
 				grouped_children.append(all_shapes[index])

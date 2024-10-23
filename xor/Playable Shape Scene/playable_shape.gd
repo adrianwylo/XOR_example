@@ -170,7 +170,7 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 	for index in children_shapes_data:
 		cutouts[index] = children_shapes_data[index]["abs base vertices"]
 	#begin nested loop of xoring (clip_polygon)
-	#sdf("BEGIN XOR ===============", "\nCutouts = ", cutouts)
+	print("BEGIN XOR ===============", "\nCutouts = ", cutouts)
 	var curr_XOR = []
 	for index_cuttee in cutouts:
 		#make this a list because result of cut could be more
@@ -183,14 +183,14 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 		#indexes
 		for index_cutter in cutouts:
 			if index_cuttee != index_cutter:
-				#sdf(index_cuttee, " is cuttee and ",index_cutter, " is cutout")
-				#sdf(cutouts[index_cutter], "(always 1) cuts out ", new_cutouts, "(",new_cutouts.size(),") to get ")
+				print(index_cuttee, " is cuttee and ",index_cutter, " is cutout")
+				print(cutouts[index_cutter], "(always 1) cuts out ", new_cutouts, "(",new_cutouts.size(),") to get ")
 				new_cutouts = clip_all_polygons(new_cutouts, cutouts[index_cutter])
-				#sdf(new_cutouts)
+				print(new_cutouts)
 					
 		#append final cutouts to the current_XOR
 		curr_XOR.append_array(new_cutouts)
-	#sdf("\n", curr_XOR, " is ready to be shifted")
+	print("\n", curr_XOR, " is ready to be shifted")
 	#shift all polygons in current_XOR
 	var shifted_curr_XOR = []
 	for shape in curr_XOR:
@@ -198,40 +198,56 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 		for vertex in shape:
 			shifted_shape.append(vertex-base_pos)
 		shifted_curr_XOR.append(shifted_shape)
-	#sdf("final shift: ", shifted_curr_XOR, base_pos)
+	print("final shift: ", shifted_curr_XOR, base_pos)
 	return shifted_curr_XOR
+
+func filter_holes(shapes: Array) -> int:
+	var non_hole_count = 0
+	for shape in shapes:
+		if not Geometry2D.is_polygon_clockwise(shape):
+			non_hole_count+=1
+	return non_hole_count
 
 #returns a list of a shapes(a cut by a single cutter)
 func clip_all_polygons(cuttee_shapes: Array[PackedVector2Array], cutter: PackedVector2Array) -> Array[PackedVector2Array]:
-	#sdf("\nBegin clip_all")
+	print("\nBegin clip_all")
 	var final_list: Array[PackedVector2Array] = []
 	for cuttee in cuttee_shapes:
-		#sdf("working with ", cutter, " cutting ", cuttee)
+		print("working with ", cutter, " cutting ", cuttee)
 		#if there is a single merge between cuts, clip should happen
-		if Geometry2D.merge_polygons(cuttee, cutter).size() == 1:
-			#sdf("there is an intersection, so clip is happening")
-			var new_cutout =  Geometry2D.clip_polygons(cuttee, cutter)
-			#sdf("clip result: ", new_cutout)
+		if filter_holes(Geometry2D.merge_polygons(cuttee, cutter)) == 1:
+			print("there is an intersection, so clip is happening")
+			var new_cutout =  Geometry2D.clip_polygons(turn_pol_clockwise(cuttee), turn_pol_clockwise(cutter))
+			print("clip result: ", new_cutout)
 			#assert(not new_cutout.is_empty(), "merge check has a flaw")
 			#check if the result is a hole
 			if new_cutout.size() > 1:
 				#process the two polygons into a hole
 				new_cutout = Hole_processing(new_cutout)
-				#sdf("processed holes: ", new_cutout)
+				print("processed holes: ", new_cutout)
 				for hole_cutout in new_cutout: 
 					final_list.append(PackedVector2Array(hole_cutout))
 			elif new_cutout.size() == 1:
-				#sdf("add the one")
+				print("add the one")
 				#append the new 
 				final_list.append(PackedVector2Array(new_cutout[0]))
 			
 				
 		else:
-			#sdf("there is no intersection")
+			print("there is no intersection")
 			final_list.append(PackedVector2Array(cuttee))
-		#sdf("FINAL NOW: ",final_list)
+		print("End clip_all ",final_list, "\n")
 	return final_list
-		
+
+
+func turn_pol_clockwise(shape: PackedVector2Array) -> PackedVector2Array:
+	if not Geometry2D.is_polygon_clockwise(shape):
+		var reversed_shape = PackedVector2Array()
+		for i in range(shape.size() - 1, -1, -1):
+			reversed_shape.append(shape[i])
+		return reversed_shape
+	return shape  # Return the shape as is if it's already clockwise
+
 		
 		
 #endregion
@@ -249,33 +265,61 @@ func Hole_processing(clip_outputs: Array) -> Array:
 			holes.append(clip_output)
 		else:
 			outlines.append(clip_output)
+	print("outlines: ", outlines, "\nholes: ", holes)
 	
-	var ref_point
+	#saved hole info
+	var chosen_hole_vertex_index # note that this represents which vertex
+	var hole_vertex
+	
+	#saved outline info
+	var chosen_outline_index  # note that this represents which outline
 	var closest_vertex
+	
+	#distance between hole_vertex and closest_vertex
 	var closest_distance
-	var chosen_outline_index
 	
 	#adds holes to outlines
 	for hole in holes:
-		#makes the reference point first vertex in shape
-		ref_point = hole[0]
+		#which point in hole being used as opener
+		chosen_hole_vertex_index = 0
+		
+		#begin with first vertex on first outline
 		closest_vertex = outlines[0][0]
-		closest_distance = ref_point.distance_to(closest_vertex)
+		#outline index
 		chosen_outline_index = 0
+		
+		#initial distance
+		closest_distance = hole[chosen_hole_vertex_index].distance_to(closest_vertex)
 		
 		#search for hole's outline
 		for outline in outlines:
-			for vertex in outline:
-				var new_distance = ref_point.distance_to(vertex)
-				if closest_distance > new_distance:
-					chosen_outline_index = outlines.find(outline)
-					closest_distance = new_distance
-					closest_vertex = vertex
+			#loop through all hole vertices
+			for index in range(hole.size()):
+				var curr_hole_vertex = hole[index]
+				for vertex in outline:
+					var new_distance = curr_hole_vertex.distance_to(vertex)
+					if closest_distance > new_distance:
+						chosen_outline_index = outlines.find(outline)
+						closest_vertex = vertex
+						chosen_hole_vertex_index = index
+						closest_distance = new_distance
 		#modify outlines to include holes
-		outlines[chosen_outline_index] = inject_hole(hole, outlines[chosen_outline_index], closest_vertex)
+		outlines[chosen_outline_index] = inject_hole(shift_hole(hole, chosen_hole_vertex_index), outlines[chosen_outline_index], closest_vertex)
 	#this is an array of packedvector2arrays(polygons)
 	return outlines
 
+# Reorders vertices in a hole such that the starting point is at a new index
+func shift_hole(hole: PackedVector2Array, start_index: int) -> PackedVector2Array:
+	var shifted_hole = PackedVector2Array()
+	# Append the part from start_index to the end
+	for i in range(start_index, hole.size()):
+		shifted_hole.append(hole[i])
+	# Append the part from the beginning to start_index
+	for i in range(0, start_index):
+		shifted_hole.append(hole[i])
+	return shifted_hole
+
+	
 # Add hole to outline
 func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_vertex: Vector2) -> PackedVector2Array:
 	# Ensure the hole is closed by appending the first vertex to the end
