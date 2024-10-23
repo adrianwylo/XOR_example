@@ -3,6 +3,8 @@ extends Node2D
 @export var new_shape: PackedScene
 #reference to child node for timing lock
 @onready var lock_timer = $Timer
+#for testing purposes
+@onready var timer = $testTimer
 
 #Track if the object is being dragged
 var dragging = false 
@@ -21,6 +23,15 @@ var all_shapes: Dictionary
 #they are all found in the dictionary, but their list of connections won't list
 #anything they aren't connected to
 var overlap_groups: Dictionary
+
+#Ack signals for shapes
+signal go(id)
+signal snap(id, mouse_pos)
+signal start_snap(grid_pos, id)
+signal display_group(display_id, children)
+signal no_display_group(id)
+
+#class definition for overlap metadata
 class overlap:
 	#shapes involved in calculation
 	var indexes_involved: Dictionary
@@ -38,11 +49,9 @@ class overlap:
 					if collided_index != index:
 						collisions.append(collided_index)
 				indexes_involved[index] = collisions
-		
 		# inject dic
 		else:
 			indexes_involved = new_dic
-		
 		#recalc display_index
 		display_index = int(indexes_involved.keys()[0])
 		for key in indexes_involved.keys():
@@ -50,12 +59,11 @@ class overlap:
 			if int_key > int(display_index):
 				display_index = int_key
 
-	
 	#check if id is in overlap
 	func id_is_in_list(id: int) -> bool:
 		return indexes_involved.has(id)
 	
-	#add a specific collision to overlap
+	#add a specific collision to overlap (TODO)
 	func add_col_to_list(new_id_1: int, new_id_2: int) -> void:
 		var cur_display_index = self.display_index
 		var found_1 = new_id_1 in indexes_involved.keys()
@@ -166,88 +174,10 @@ class overlap:
 			var int_key = int(key)
 			if int_key > int(display_index):
 				display_index = int_key
-	
-#Ack signals for shapes
-signal go(id)
-signal snap(id, mouse_pos)
-signal start_snap(grid_pos, id)
-signal display_group(display_id, children)
-signal no_display_group(id)
 
-#for testing purposes
-@onready var timer = $testTimer
+#region Overlap Calcs
+#signal from child that theres a collision (TODO)
 
-# Called when the node enters the scene tree for the first time.
-func _ready() -> void:
-	# Start the timer with 10 seconds interval for testing purposes
-	timer.wait_time = 8
-	timer.start()
-	overlap_groups = {}
-	all_shapes = {}
-
-#Find the key associated with the id
-func find_key_with_id(id) -> int:
-	for key in overlap_groups:
-		if id in overlap_groups[key].indexes_involved:
-			return key
-	return -1
-	
-#Calculates overlaps constantly and changes views
-#func _physics_process(delta: float) -> void:
-	#for id in all_shapes:
-		#var key = find_key_with_id(id)
-		#if key != -1:
-			#var grouped_children = []
-			#for index in overlap_groups[key].indexes_involved:
-				#grouped_children.append(all_shapes[index])
-			#emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
-			#
-		#else:
-			#emit_signal("no_display_group", id)
-
-# debug rendition of process
-func _on_test_timer_timeout() -> void: 
-	print("\n\n\n NEW ROUND----------------------------------------------------")
-	for id in all_shapes:
-		var key = find_key_with_id(id)
-		if key != -1:
-			print("\nindexes in group = ", overlap_groups[key].indexes_involved)
-			var grouped_children = []
-			for index in overlap_groups[key].indexes_involved:
-				grouped_children.append(all_shapes[index])
-			emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
-			
-		else:
-			emit_signal("no_display_group", id)
-
-#create new instance of the playable_shape scene
-func shape_create(metadata, map) -> void:
-	var shape = new_shape.instantiate()
-	shape.pass_metadata(metadata.vertices, metadata.tl, metadata.br)
-	shape.pass_map(map)
-	shape.connect("free_drag", _on_piece_free_drag)
-	shape.connect("occupy_drag", _on_piece_occupy_drag)
-	shape.connect("continue_q", _on_piece_continue_q)
-	shape.connect("overlapping", _on_piece_overlap)
-	shape.connect("not_overlapping", _on_piece_no_overlap)
-	add_child(shape)
-	all_shapes[get_child_count()-1] = shape
-
-#detects whether there is a phony collision
-func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
-	var shared_vertices = []
-	for vertex1 in shape1:
-		for vertex2 in shape2:
-			if vertex1 == vertex2:
-				shared_vertices.append(vertex1)
-	if shared_vertices.size() == 0:
-		return false
-	var excluded_polygons = Geometry2D.exclude_polygons(shape1, shape2)
-	if excluded_polygons.size() == 2:
-		return true
-	return false
-
-#signal from child that theres a collision
 func _on_piece_overlap(other_id: int, id: int):
 	print("Test overlap of ", id, " and ", other_id)
 	var id_group_key = -1
@@ -268,26 +198,28 @@ func _on_piece_overlap(other_id: int, id: int):
 	
 	# Case 1: Neither ID is in any group, create a new group
 	if id_group_key == -1 and other_id_group_key == -1:
-		print("Case 1 for ", id, " and ", other_id)
+		print("//Case 1 for ", id, " and ", other_id)
 		var key = -1
 		while overlap_groups.has(key) or key == -1:
 			key = randi()
 		overlap_groups[key] = overlap.new([other_id, id])
-		
+		print(overlap_groups[key].indexes_involved)
 	
 	# Case 2: other_id is in a group, add id to it
 	elif id_group_key == -1 and other_id_group_key != -1:
-		print("Case 2 for ", id, " and ", other_id)
+		print("//Case 2 for ", id, " and ", other_id)
 		overlap_groups[other_id_group_key].add_col_to_list(id,other_id)
+		print(overlap_groups[other_id_group_key].indexes_involved)
 
 	# Case 3: id is in a group, add other_id to it
 	elif id_group_key != -1 and other_id_group_key == -1:
-		print("Case 3 for ", id, " and ", other_id)
+		print("//Case 3 for ", id, " and ", other_id)
 		overlap_groups[id_group_key].add_col_to_list(id,other_id)
+		print(overlap_groups[id_group_key].indexes_involved)
 
 	# Case 4: Both IDs are in different groups, merge the groups by creating a new one that represents all of them
 	elif id_group_key != other_id_group_key:
-		print("Case 4 for ", id, " and ", other_id)
+		print("//Case 4 for ", id, " and ", other_id)
 		var og_dic = overlap_groups[id_group_key].indexes_involved
 		var other_dic = overlap_groups[other_id_group_key].indexes_involved
 		var combined_dic = {}
@@ -315,15 +247,17 @@ func _on_piece_overlap(other_id: int, id: int):
 		# Remove the old and new group
 		overlap_groups.erase(id_group_key)
 		overlap_groups.erase(other_id_group_key)  
+		print(overlap_groups[key].indexes_involved)
 	# Case 5: Both IDs are in same group, update index tables accordingly
 	else:
-		print("Case 5 for ", id, " and ", other_id)
+		print("//Case 5 for ", id, " and ", other_id)
 		overlap_groups[other_id_group_key].add_col_to_list(id,other_id)
-	print("===========================================\n")
+		print(overlap_groups[other_id_group_key].indexes_involved)
 			
 			
 # Signal from child indicating there's no more collision
 func _on_piece_no_overlap(other_id: int, id: int):
+	print("Test cease overlap of ", id, " and ", other_id)
 	var id_group_key = -1
 	var other_id_group_key = -1
 	
@@ -363,7 +297,10 @@ func _on_piece_no_overlap(other_id: int, id: int):
 		#the group is empty after operation and must be removed from overlap_groups
 		elif sep_vertices.size() == 1:
 			overlap_groups.erase(old_key)
-	print("===========================================")
+	
+#endregion
+
+#region Life of the Drag
 #ack function picking a piece
 func _on_piece_occupy_drag(id) -> void:
 	if dragging == false and dragged_shape_id == -1:
@@ -374,7 +311,6 @@ func _on_piece_occupy_drag(id) -> void:
 		#turn on flag for going
 		dragging = true
 		emit_signal("go", id)
-	
 
 #ack function for letting go of piece (requests grid nodes for info)
 func _on_piece_free_drag(id, corner_pos) -> void:
@@ -396,8 +332,88 @@ func _on_lock_timer_timeout() -> void:
 	dragged_shape_id = -1
 	dragging = false 
 	lock_timer.stop()
+#endregion
 
+#region Initialization
 #creates pieces on board from list of list of positions
 func _on_solution_create_pieces(shape_pieces: Variant, pos_dic: Variant) -> void:
 	for polygon in shape_pieces:
 		shape_create(polygon, pos_dic)
+
+#create new instance of the playable_shape scene
+func shape_create(metadata, map) -> void:
+	var shape = new_shape.instantiate()
+	shape.pass_metadata(metadata.vertices, metadata.tl, metadata.br)
+	shape.pass_map(map)
+	shape.connect("free_drag", _on_piece_free_drag)
+	shape.connect("occupy_drag", _on_piece_occupy_drag)
+	shape.connect("continue_q", _on_piece_continue_q)
+	shape.connect("overlapping", _on_piece_overlap)
+	shape.connect("not_overlapping", _on_piece_no_overlap)
+	add_child(shape)
+	all_shapes[get_child_count()-1] = shape
+	
+# Called when the node enters the scene tree for the first time.
+func _ready() -> void:
+	# Start the timer with 10 seconds interval for testing purposes
+	timer.wait_time = 8
+	timer.start()
+	overlap_groups = {}
+	all_shapes = {}
+
+#endregion
+
+#region Action
+#Calculates overlaps constantly and changes views
+#func _physics_process(delta: float) -> void:
+	#for id in all_shapes:
+		#var key = find_key_with_id(id)
+		#if key != -1:
+			#var grouped_children = []
+			#for index in overlap_groups[key].indexes_involved:
+				#grouped_children.append(all_shapes[index])
+			#emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
+			#
+		#else:
+			#emit_signal("no_display_group", id)
+
+# debug rendition of process
+func _on_test_timer_timeout() -> void: 
+	print("\n\n\n NEW ROUND----------------------------------------------------")
+	for id in all_shapes:
+		var key = find_key_with_id(id)
+		if key != -1:
+			print("\nindexes in group = ", overlap_groups[key].indexes_involved)
+			var grouped_children = []
+			for index in overlap_groups[key].indexes_involved:
+				grouped_children.append(all_shapes[index])
+			emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
+			
+		else:
+			emit_signal("no_display_group", id)
+#endregion
+
+#region Helpers
+#Find the key associated with the id
+func find_key_with_id(id) -> int:
+	for key in overlap_groups:
+		if id in overlap_groups[key].indexes_involved:
+			return key
+	return -1
+
+#detects whether there is a phony collision
+func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
+	var shared_vertices = []
+	for vertex1 in shape1:
+		for vertex2 in shape2:
+			if vertex1 == vertex2:
+				shared_vertices.append(vertex1)
+	if shared_vertices.size() == 0:
+		return false
+	var intersected_polygons = Geometry2D.intersect_polygons(shape1, shape2)
+	var merge_polygons =  Geometry2D.merge_polygons(shape1, shape2)
+	if intersected_polygons.size() == 0 and merge_polygons.size() == 2:
+		print("intersecsetwseef ",intersected_polygons)
+		return true
+	return false
+#endregion
