@@ -125,13 +125,6 @@ var mapped_shapes
 var final_metadata
 #WILL BE MORE... (consolidate difficulty rating within this function)
 #-------------------------------------------------------------------------------
-#in-built
-func _ready() -> void:
-	pass
-	
-#in-built
-func _process(delta: float) -> void:
-	pass
 
 #randomly chooses a direction (input = blacklisted options)
 func choose_direction(no: Array) -> int:
@@ -303,38 +296,6 @@ func map_shapes() -> void:
 	#for 2 choice items (l/r and u/d)
 	#[0 = u/d, 1 = l/r]
 	
-	#SHAPES WILL BE DRAWN WITH CLOCKWISE DIRECTION
-	final_metadata = [playable_metadata.new([Vector2(0,0),
-											 Vector2(3,0),
-											 Vector2(3,3),
-											 Vector2(0,3)],
-											 Vector2(0,0),
-											 Vector2(2,2)),
-					  playable_metadata.new([Vector2(5,0),
-											 Vector2(6,0),
-											 Vector2(6,1),
-											 Vector2(5,1)], 
-											 Vector2(5,0),
-											 Vector2(6,1)),
-					  playable_metadata.new([Vector2(0,5),
-											 Vector2(0,7),
-											 Vector2(2,7),
-											 Vector2(2,5)], 
-											 Vector2(0,5),
-											 Vector2(2,7)),
-					  playable_metadata.new([Vector2(0,5),
-											 Vector2(0,8),
-											 Vector2(2,8),
-											 Vector2(2,5)], 
-											 Vector2(0,5),
-											 Vector2(2,8)),
-					  playable_metadata.new([Vector2(0,5),
-											 Vector2(0,8),
-											 Vector2(2,8),
-											 Vector2(2,5)], 
-											 Vector2(0,5),
-											 Vector2(2,8))]
-					
 	for shape_areas in shape_areas:
 		#this it the top/leftmost corner of shape (does not have to be vertex)
 		var tl_reference_pos
@@ -376,7 +337,7 @@ func map_shapes() -> void:
 #script call
 func _on_main_init_solution(node_count: Variant, difficulty: Variant, pos_dic: Variant) -> void:
 	#note that max_shape_count is moreso tied to node count than anything
-	max_shape_count = node_count*node_count/3
+	max_shape_count = node_count*2
 	#note that this is in units of grid_index squared
 	total_area = floor(node_count*node_count*0.9)
 	process_difficulty(difficulty)
@@ -384,5 +345,40 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant, pos_dic: V
 	map_shapes()
 	#AT THE MOMENT THESE ARE JUST RANDO SHAPES, BUT WE NEED PLAYABLE PIECES AND SOLUTION PIECES
 	#WHEN PASSED IN, THESE HAVE TO BE POSITIONS NOT JUST COORDINATES
+	#SHAPES WILL BE DRAWN WITH CLOCKWISE DIRECTION
+	final_metadata = [playable_metadata.new([Vector2(0,0),
+											 Vector2(3,0),
+											 Vector2(3,3),
+											 Vector2(2,3),
+											 Vector2(2,1),
+											 Vector2(1,1),
+											 Vector2(1,3),
+											 Vector2(0,3)],
+											 Vector2(0,0),
+											 Vector2(3,3)),
+					  #playable_metadata.new([Vector2(5,0),
+											 #Vector2(6,0),
+											 #Vector2(6,1),
+											 #Vector2(5,1)], 
+											 #Vector2(5,0),
+											 #Vector2(6,1)),
+					  playable_metadata.new([Vector2(0,5),
+											 Vector2(0,7),
+											 Vector2(2,7),
+											 Vector2(2,5)], 
+											 Vector2(0,5),
+											 Vector2(2,7))]
+					  #playable_metadata.new([Vector2(0,5),
+											 #Vector2(0,8),
+											 #Vector2(2,8),
+											 #Vector2(2,5)], 
+											 #Vector2(0,5),
+											 #Vector2(2,8)),
+					  #playable_metadata.new([Vector2(0,5),
+											 #Vector2(0,8),
+											 #Vector2(2,8),
+											 #Vector2(2,5)], 
+											 #Vector2(0,5),
+											 #Vector2(2,8))]
 	emit_signal("create_pieces", final_metadata, pos_dic)
 	

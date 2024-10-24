@@ -28,17 +28,13 @@ func initialize_data(size_scale: float, length: float, grid_coordinate: Vector2i
 							Vector2i(half_len,half_len),
 							Vector2i(-half_len,half_len)]
 
-func check_snap(corner_pos) -> void:
-	if Geometry2D.is_point_in_polygon(to_local(corner_pos), collision_shape.polygon):
-		#this is correct, but shouldnt be mouse_pos
-		#print("closest to " + str(grid_location))
-		emit_signal("snap_found", grid_location)
-		
+func pos_found_in_node(corner_pos) -> bool:
+	return Geometry2D.is_point_in_polygon(to_local(corner_pos), collision_shape.polygon)
+
+func ret_grid_location() -> Vector2i:
+	return grid_location
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	collision_shape.polygon = PackedVector2Array(collision_array)
 	sprite.scale = sprite.scale * node_scale
-
-func _process(delta: float) -> void:
-	pass

@@ -323,9 +323,9 @@ func _on_piece_occupy_drag(id) -> void:
 		emit_signal("go", id)
 
 #ack function for letting go of piece (requests grid nodes for info)
-func _on_piece_free_drag(id, corner_pos) -> void:
+func _on_piece_free_drag(id, corner_pos, area_offset) -> void:
 	if dragged_shape_id == id:
-		emit_signal("snap", id, corner_pos)
+		emit_signal("snap", id, corner_pos, Vector2(area_offset.x,area_offset.y))
 
 #pipe grid coordinates to shape
 func _on_grid_pieces_snap_info(grid_pos: Variant) -> void:

@@ -70,9 +70,8 @@ var velocity: Vector2 = Vector2.ZERO  # Velocity to keep track of the current sp
 func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
 	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
 	var other_node_id = other_shape_node.return_id()
-	#sdf("I'm connected to ", connected_node_id, " and i want to join ", other_node_id, "?")
-	#if connected_node_id == -1:
-		#connected_node_id = other_node_id
+	print()
+	print(identity, " entering ", other_node_id)
 	emit_signal("overlapping", other_node_id, identity)
 		
 
@@ -80,12 +79,8 @@ func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, 
 func _on_area_shape_exited(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
 	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
 	var other_node_id = other_shape_node.return_id()
-	#sdf("I'm connected to ", connected_node_id, " and i want to leave ", other_node_id, "?")
-	#if connected_node_id == other_node_id:
-		
+	print(identity, " exiting ", other_node_id)
 	emit_signal("not_overlapping",other_node_id , identity)
-		#connected_node_id = -1
-		
 #endregion
 
 #region report functions
@@ -338,52 +333,6 @@ func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 	#print("\n\nFinal Output: ", shifted_final)
 	return shifted_final
 	
-
-	
-	#
-	#
-	#var cutouts = {} #{index:[shape1, shape2...]
-	##create cutouts dictionary
-	#for index in children_shapes_data:
-		#cutouts[index] = children_shapes_data[index]["abs base vertices"]
-	##begin nested loop of xoring (clip_polygon)
-	##print("BEGIN XOR ===============", "\nCutouts = ", cutouts)
-	#var curr_XOR = []
-	#for index_cuttee in cutouts:
-		##make this a list because result of cut could be more
-		#var new_cutouts: Array[PackedVector2Array] = []
-		#new_cutouts.append(PackedVector2Array(cutouts[index_cuttee]))
-		#
-		##per iteration over the cutter, the ammount of shapes to be "cut"
-		##will only grow (because a clipped shape can be divided into two
-		##thus the new cutouts are constantly updated as we go through the 
-		##indexes
-		#for index_cutter in cutouts:
-			#if index_cuttee != index_cutter:
-				##print(index_cuttee, " is cuttee and ",index_cutter, " is cutout")
-				##print(cutouts[index_cutter], "(always 1) cuts out ", new_cutouts, "(",new_cutouts.size(),") to get ")
-				#new_cutouts = clip_all_polygons(new_cutouts, cutouts[index_cutter])
-				##print(new_cutouts)
-					#
-		##append final cutouts to the current_XOR
-		#curr_XOR.append_array(new_cutouts)
-	##print("\n", curr_XOR, " is ready to be shifted")
-	##shift all polygons in current_XOR
-	#
-	#
-	#
-	#
-	#var shifted_curr_XOR = []
-	#for shape in curr_XOR:
-		#var shifted_shape = []
-		#for vertex in shape:
-			#shifted_shape.append(vertex-base_pos)
-		#shifted_curr_XOR.append(shifted_shape)
-	##print("final shift: ", shifted_curr_XOR, base_pos)
-	#return shifted_curr_XOR
-
-
-
 func filter_holes(shapes: Array) -> int:
 	var non_hole_count = 0
 	for shape in shapes:
@@ -453,7 +402,6 @@ func Hole_processing(clip_outputs: Array) -> Array:
 	
 	#saved hole info
 	var chosen_hole_vertex_index # note that this represents which vertex
-	var hole_vertex
 	
 	#saved outline info
 	var chosen_outline_index  # note that this represents which outline
@@ -569,7 +517,10 @@ func _ready() -> void:
 	# for movement bounds
 	screen_size = Vector2i(get_viewport_rect().size)
 	
+	print("offset is ", br_pos, " - ",  tl_pos)
 	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
+	
+	
 	
 	# create base shape
 	#NOTE the coordinates passsed in here are relative to the position already
@@ -616,7 +567,7 @@ func _input(event: InputEvent) -> void:
 	click_event = event
 	if event is InputEventMouseButton and event.button_index == 1 and event.pressed:
 		if dragging == true:
-			emit_signal("free_drag", identity, event.position - mouse_offset)
+			emit_signal("free_drag", identity, event.position - mouse_offset, coor_to_px(br_pos - Vector2i(1,1)) - coor_to_px(tl_pos))
 		else:
 			if Geometry2D.is_point_in_polygon(to_local(event.position), base_col2d.polygon):
 				#request to start dragging

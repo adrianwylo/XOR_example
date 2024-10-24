@@ -57,6 +57,7 @@ func create_grid() -> void:
 	grid_offset += margin_offset
 	len_of_cell = int(grid_size/(node_count-1))
 	
+	
 	#decide scale of nodes with reference to screen size
 	size_scale = 0.02#temp placeholder
 	
@@ -71,21 +72,21 @@ func create_grid() -> void:
 			
 			#create node as child
 			var node = new_node.instantiate()
-			node.connect("snap_found", _on_snap_found)
 			node.position = node_pos
 			node.initialize_data(size_scale, len_of_cell, Vector2i(int(x),int(y)), is_edge)
 			add_child(node)
 
-	#might want to consider looking at how screen size changes will affect the grid		
-	
-
-func _on_snap_found(grid_coor):
-	emit_signal("snap_info", grid_coor)
-
 #query children for a snap
-func _on_playable_pieces_snap(id: Variant, corner_pos: Variant) -> void:
-	var child_count = get_child_count()
+func _on_playable_pieces_snap(id: Variant, corner_pos: Variant, area_offset: Variant) -> void:
+	var bot_right_pos = corner_pos + area_offset
+	var top_left_pos = corner_pos
+	var child_count = get_child_count()		
 	for i in range(child_count):
-		var child = get_child(i)
-		child.check_snap(corner_pos)
+		var tlchild = get_child(i)
+		if tlchild.pos_found_in_node(top_left_pos):
+			for a in range(child_count):
+				var brchild = get_child(a)
+				if brchild.pos_found_in_node(bot_right_pos):
+					emit_signal("snap_info", tlchild.ret_grid_location())
+
 	
