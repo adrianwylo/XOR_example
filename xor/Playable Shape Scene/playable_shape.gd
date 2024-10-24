@@ -147,7 +147,7 @@ func display_overlap(pol_list):
 	for vertices in pol_list:
 		var polygon_node = Polygon2D.new()
 		polygon_node.polygon = vertices
-		polygon_node.modulate = Color(randf(), randf(), randf())
+		polygon_node.modulate = Color(1, 0.894118, 0.768627, 1) 
 		add_child(polygon_node)
 		polygon_node.show()
 
@@ -162,44 +162,227 @@ func _no_show_group(id):
 		is_display = false
 		is_in_group = false
 
+#checks if two packed arrays are equal
+func are_lists_equal(list1: PackedVector2Array, list2: PackedVector2Array) -> bool:
+		for i in range(list1.size()):
+			if list1[i] != list2[i]:
+				return false
+		return true
+
+#checks if two shapes are same (considers clockwise polarity + vertex ordering)
+func same_shape(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
+	if shape1.size() != shape2.size():
+		return false
+	# Now check regular
+	for i in range(shape2.size()):
+		var shifted_shape2 = PackedVector2Array()
+		for j in range(shape2.size()):
+			shifted_shape2.append(shape2[(i + j) % shape2.size()])
+		if are_lists_equal(shape1, shifted_shape2):
+			return true
+
+	# Now check reverse 
+	var reversed_shape2 = shape2.duplicate()
+	reversed_shape2.reverse()
+	for i in range(reversed_shape2.size()):
+		var rotated_reversed_shape2 = PackedVector2Array()
+		for j in range(reversed_shape2.size()):
+			rotated_reversed_shape2.append(reversed_shape2[(i + j) % reversed_shape2.size()])
+		if are_lists_equal(shape1, rotated_reversed_shape2):
+			return true
+	return false
+
+func find_shape_key(shape: PackedVector2Array, cutout_shapes: Dictionary) -> int:
+	for key in cutout_shapes:
+		if same_shape(cutout_shapes[key], shape):
+			return key
+	#key not found
+	return -1
+
 #Performs XOR operation on all children (TODO)
 func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
 	var base_pos = children_shapes_data[display_id]["position"]
-	var cutouts = {} #{index:[shape1, shape2...]
-	#create cutouts dictionary
-	for index in children_shapes_data:
-		cutouts[index] = children_shapes_data[index]["abs base vertices"]
-	#begin nested loop of xoring (clip_polygon)
-	print("BEGIN XOR ===============", "\nCutouts = ", cutouts)
-	var curr_XOR = []
-	for index_cuttee in cutouts:
-		#make this a list because result of cut could be more
-		var new_cutouts: Array[PackedVector2Array] = []
-		new_cutouts.append(PackedVector2Array(cutouts[index_cuttee]))
-		
-		#per iteration over the cutter, the ammount of shapes to be "cut"
-		#will only grow (because a clipped shape can be divided into two
-		#thus the new cutouts are constantly updated as we go through the 
-		#indexes
-		for index_cutter in cutouts:
-			if index_cuttee != index_cutter:
-				print(index_cuttee, " is cuttee and ",index_cutter, " is cutout")
-				print(cutouts[index_cutter], "(always 1) cuts out ", new_cutouts, "(",new_cutouts.size(),") to get ")
-				new_cutouts = clip_all_polygons(new_cutouts, cutouts[index_cutter])
-				print(new_cutouts)
+	var cutout_count = {} #{int(key): int(Amount of times overlapped)....}
+	var cutout_shapes = {} #{int(key): PackedVector2Array(shape)....}
+	
+	#fill up the dictionary for referencing shapes
+	var shape_info = {} #{int(shape_id): Packed_Vertice_Array(Base Shape)
+	for shape_id in children_shapes_data:
+		shape_info[shape_id] = children_shapes_data[shape_id]["abs base vertices"]
+	
+	#initialize cutouts
+	var first_id = shape_info.keys()[0]
+	var first_shape = shape_info[first_id]
+	var new_key = randi()
+	cutout_shapes[new_key] = first_shape
+	cutout_count[new_key] = 1
+	
+	var sliced_shape_ids = shape_info.keys().slice(1, shape_info.size())  # Start from the second key
+	#print("we begin initializing with ", first_id, " and now have to go over ", sliced_shape_ids)
+	#print("BEGIN XOR ===============")
+	for id in sliced_shape_ids:
+		#print("looking at ", id)
+		var must_add_keys = []
+		var must_delete_keys = [] 
+		var new_shape = shape_info[id]
+		var shape_key = find_shape_key(new_shape, cutout_shapes)
+		if shape_key == -1:
+			#print(new_shape, " is an UNseen new shape")
+			#iterate through all known shapes and check if there should be a xor occuring
+			
+			#per iteration, the saved overlap portion will get subtracted from new_shape
+			#what's leftover will be added as a new entry to end of forloop
+			var final_shape_additions: Array[PackedVector2Array] = [new_shape]
+			
+			#print("\nbeginning loop for cutout_shapes:")
+			#iterate over all old cutout shapes and see how they interact with new ones
+			for key in cutout_shapes:
+				#print(cutout_shapes)
+				#print("begin cutout loop cycle on key ", key)
+				var old_shape = cutout_shapes[key]
+				#print(old_shape, " is the old shape")
+				var test_merge = Geometry2D.merge_polygons(old_shape,new_shape)
+				var test_intersect = Geometry2D.intersect_polygons(old_shape,new_shape)
+				#print("merging gets: ", test_merge)
+				#print("intersecting gets: ", test_intersect)
+				#check if new shape needs to interact with old shape
+				if  filter_holes(test_merge) == 1 and test_intersect.size() != 0:
+					#ensures there is an overlap
+					#print("there are new shapes from this")
+					var old_shape_count = cutout_count[key]
+					#print("old_shape's count is ", old_shape_count)
+					#categorize new overlaps as new shapes with new count
+					var areas_intersected = test_intersect
+					#all overlaps necessitate a new shape
+					#print("\nevaluating areas intersected")
+					for area_intersected in areas_intersected:
+						var new_val = {							
+							"shape": area_intersected,
+							"count": 1 + old_shape_count
+						}
+						#print("(touched) queing adding ", new_val)
+						must_add_keys.append(new_val)
+						
 					
-		#append final cutouts to the current_XOR
-		curr_XOR.append_array(new_cutouts)
-	print("\n", curr_XOR, " is ready to be shifted")
-	#shift all polygons in current_XOR
-	var shifted_curr_XOR = []
-	for shape in curr_XOR:
+					
+					#categorize clipped old shapes as new shapes with old count
+					#print("\nevaluating areas untouched")
+					var areas_untouched = clip_all_polygons([old_shape], new_shape)
+					#print("untouched areas = ", areas_untouched)
+					if not areas_untouched.is_empty():
+						#if there are shapes from the clip
+						for area_untouched in areas_untouched:
+							var new_val = {
+								"shape": area_untouched,
+								"count": old_shape_count
+							}
+							#print("(untouched) queing adding ", new_val)
+							must_add_keys.append(new_val)
+										
+					#queue delete the old shape because it has been cut up now
+					must_delete_keys.append(key)
+					#update the final shape addition
+					final_shape_additions = clip_all_polygons(final_shape_additions,old_shape)
+				#else:
+					#print("there is no interaction between cutout and new shape")
+			
+			
+			#add final shape as new shape
+			if not final_shape_additions.is_empty():
+				#print("Leftover portion of new_shape: ", final_shape_additions, "\nis being added to data")
+				for final_shape_addition in final_shape_additions:
+					new_key = -1
+					while cutout_shapes.has(new_key) or new_key == -1:
+						new_key = randi() # Generate a random unique key
+					cutout_shapes[new_key] = final_shape_addition
+					cutout_count[new_key] = 1
+		else:
+			#print(new_shape, " is a seen new shape")
+			#need to add to the count of that shape
+			cutout_count[shape_key]+=1
+		
+		#delete the keys queued for deletion
+		#print("deleting queued keys")
+		for deletion_key in must_delete_keys:
+			cutout_count.erase(deletion_key)
+			cutout_shapes.erase(deletion_key)
+		
+		#add new shapes
+		#print("adding queued shapes")
+		for struct in must_add_keys:
+			#print("adding ", struct)
+			new_key = -1
+			while cutout_shapes.has(new_key) or new_key == -1:
+				new_key = randi() # Generate a random unique key
+			cutout_shapes[new_key] = struct["shape"]
+			cutout_count[new_key] = struct["count"]
+			
+		
+		#print("\ncutout_shapes is: ", cutout_shapes, "\ncutout_count is: ", cutout_count)
+	
+	#print("\n\nDONE WITH ITERATION")
+	#putting the overlaps that have an odd count in final array
+	var unshifted_final = []
+	for key in cutout_count:
+		if cutout_count[key]%2 == 1:
+			unshifted_final.append(cutout_shapes[key])
+	
+	#shifting overlaps relative to display_id position
+	var shifted_final = []
+	for shape in unshifted_final:
 		var shifted_shape = []
 		for vertex in shape:
-			shifted_shape.append(vertex-base_pos)
-		shifted_curr_XOR.append(shifted_shape)
-	print("final shift: ", shifted_curr_XOR, base_pos)
-	return shifted_curr_XOR
+			shifted_shape.append(vertex - base_pos)
+		shifted_final.append(shifted_shape)
+	#print("\n\nUnshifted Output: ", unshifted_final)
+	#print("\n\nFinal Output: ", shifted_final)
+	return shifted_final
+	
+
+	
+	#
+	#
+	#var cutouts = {} #{index:[shape1, shape2...]
+	##create cutouts dictionary
+	#for index in children_shapes_data:
+		#cutouts[index] = children_shapes_data[index]["abs base vertices"]
+	##begin nested loop of xoring (clip_polygon)
+	##print("BEGIN XOR ===============", "\nCutouts = ", cutouts)
+	#var curr_XOR = []
+	#for index_cuttee in cutouts:
+		##make this a list because result of cut could be more
+		#var new_cutouts: Array[PackedVector2Array] = []
+		#new_cutouts.append(PackedVector2Array(cutouts[index_cuttee]))
+		#
+		##per iteration over the cutter, the ammount of shapes to be "cut"
+		##will only grow (because a clipped shape can be divided into two
+		##thus the new cutouts are constantly updated as we go through the 
+		##indexes
+		#for index_cutter in cutouts:
+			#if index_cuttee != index_cutter:
+				##print(index_cuttee, " is cuttee and ",index_cutter, " is cutout")
+				##print(cutouts[index_cutter], "(always 1) cuts out ", new_cutouts, "(",new_cutouts.size(),") to get ")
+				#new_cutouts = clip_all_polygons(new_cutouts, cutouts[index_cutter])
+				##print(new_cutouts)
+					#
+		##append final cutouts to the current_XOR
+		#curr_XOR.append_array(new_cutouts)
+	##print("\n", curr_XOR, " is ready to be shifted")
+	##shift all polygons in current_XOR
+	#
+	#
+	#
+	#
+	#var shifted_curr_XOR = []
+	#for shape in curr_XOR:
+		#var shifted_shape = []
+		#for vertex in shape:
+			#shifted_shape.append(vertex-base_pos)
+		#shifted_curr_XOR.append(shifted_shape)
+	##print("final shift: ", shifted_curr_XOR, base_pos)
+	#return shifted_curr_XOR
+
+
 
 func filter_holes(shapes: Array) -> int:
 	var non_hole_count = 0
@@ -210,35 +393,35 @@ func filter_holes(shapes: Array) -> int:
 
 #returns a list of a shapes(a cut by a single cutter)
 func clip_all_polygons(cuttee_shapes: Array[PackedVector2Array], cutter: PackedVector2Array) -> Array[PackedVector2Array]:
-	print("\nBegin clip_all")
+	#print("Begin clip_all")
 	var final_list: Array[PackedVector2Array] = []
 	for cuttee in cuttee_shapes:
-		print("working with ", cutter, " cutting ", cuttee)
+		#print("working with ", cutter, " cutting ", cuttee)
 		#if there is a single merge between cuts, clip should happen
 		if filter_holes(Geometry2D.merge_polygons(cuttee, cutter)) == 1:
-			print("there is an intersection, so clip is happening")
+			#print("there is an intersection, so clip is happening")
 			var new_cutout =  Geometry2D.clip_polygons(turn_pol_clockwise(cuttee), turn_pol_clockwise(cutter))
-			print("clip result: ", new_cutout)
+			#print("clip result: ", new_cutout)
 			#assert(not new_cutout.is_empty(), "merge check has a flaw")
 			#check if the result is a hole
 			if new_cutout.size() > 1:
 				#process the two polygons into a hole
 				new_cutout = Hole_processing(new_cutout)
-				print("processed holes: ", new_cutout)
+				#print("processed holes: ", new_cutout)
 				for hole_cutout in new_cutout: 
 					final_list.append(PackedVector2Array(hole_cutout))
 			elif new_cutout.size() == 1:
-				print("add the one")
+				#print("add the one")
 				#append the new 
 				final_list.append(PackedVector2Array(new_cutout[0]))
 			
 				
 		else:
-			print("there is no intersection")
+			#print("there is no intersection")
 			final_list.append(PackedVector2Array(cuttee))
-		print("End clip_all ",final_list, "\n")
+		#print("End clip_all ",final_list, "\n")
 	return final_list
-
+	
 
 func turn_pol_clockwise(shape: PackedVector2Array) -> PackedVector2Array:
 	if not Geometry2D.is_polygon_clockwise(shape):
@@ -246,7 +429,7 @@ func turn_pol_clockwise(shape: PackedVector2Array) -> PackedVector2Array:
 		for i in range(shape.size() - 1, -1, -1):
 			reversed_shape.append(shape[i])
 		return reversed_shape
-	return shape  # Return the shape as is if it's already clockwise
+	return shape 
 
 		
 		
@@ -265,7 +448,8 @@ func Hole_processing(clip_outputs: Array) -> Array:
 			holes.append(clip_output)
 		else:
 			outlines.append(clip_output)
-	print("outlines: ", outlines, "\nholes: ", holes)
+	#print("outlines: ", outlines, "\nholes: ", holes)
+	
 	
 	#saved hole info
 	var chosen_hole_vertex_index # note that this represents which vertex
@@ -303,10 +487,18 @@ func Hole_processing(clip_outputs: Array) -> Array:
 						closest_vertex = vertex
 						chosen_hole_vertex_index = index
 						closest_distance = new_distance
-		#modify outlines to include holes
-		outlines[chosen_outline_index] = inject_hole(shift_hole(hole, chosen_hole_vertex_index), outlines[chosen_outline_index], closest_vertex)
+		#check if the hole found is valid, or a shape splitter
+		if shared_vertices(outlines[chosen_outline_index],hole) > 1:
+			#print("THIS ISNT A HOLE, IT's A SHAPE SPLITTER")
+			outlines[chosen_outline_index] = Geometry2D.clip_polygons(outlines[chosen_outline_index], hole)[0]
+			outlines.append(Geometry2D.clip_polygons(outlines[chosen_outline_index], hole)[1])
+		else:
+			#print("THIS IS A HOLE")
+			#modify outlines to include holes
+			outlines[chosen_outline_index] = inject_hole(shift_hole(hole, chosen_hole_vertex_index), outlines[chosen_outline_index], closest_vertex)
 	#this is an array of packedvector2arrays(polygons)
 	return outlines
+
 
 # Reorders vertices in a hole such that the starting point is at a new index
 func shift_hole(hole: PackedVector2Array, start_index: int) -> PackedVector2Array:
@@ -318,7 +510,6 @@ func shift_hole(hole: PackedVector2Array, start_index: int) -> PackedVector2Arra
 	for i in range(0, start_index):
 		shifted_hole.append(hole[i])
 	return shifted_hole
-
 	
 # Add hole to outline
 func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_vertex: Vector2) -> PackedVector2Array:
@@ -337,12 +528,8 @@ func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_
 #region Corner checker
 #checks if two shapes exclusively share corners
 func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
-	var shared_vertices = []
-	for vertex1 in shape1:
-		for vertex2 in shape2:
-			if vertex1 == vertex2:
-				shared_vertices.append(vertex1)
-	if shared_vertices.size() == 0:
+	var no_shared_vert = shared_vertices(shape1, shape2)
+	if no_shared_vert == 0:
 		return false
 	var intersected_polygons = Geometry2D.intersect_polygons(shape1, shape2)
 	var merge_polygons =  Geometry2D.merge_polygons(shape1, shape2)
@@ -351,14 +538,15 @@ func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
 	return false
 
 #checks if two shapes share a vertice
-func shared_vertices(shape1: Array, shape2: Array) -> bool:
+func shared_vertices(shape1: Array, shape2: Array) -> int:
 	# Iterate over vertices in shape1
+	var shared_no = 0
 	for vertex1 in shape1:
 		# Check if the vertex is also in shape2
 		for vertex2 in shape2:
 			if vertex2 == vertex1:
-				return true  # Shared vertex found
-	return false  # No shared vertices found
+				shared_no+=1  # Shared vertex found
+	return shared_no # No shared vertices found
 #endregion
 
 #region Initialization Functions
@@ -387,7 +575,7 @@ func _ready() -> void:
 	#NOTE the coordinates passsed in here are relative to the position already
 	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
 	base_pol2d.polygon = base_shape_vertices
-	base_pol2d.modulate = Color(1, 0, 0) 
+	base_pol2d.modulate = Color(1, 0.894118, 0.768627, 1)
 	
 	# create clickable collision a little smaller 
 	base_col2d.polygon = base_shape_vertices

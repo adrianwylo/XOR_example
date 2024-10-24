@@ -194,10 +194,10 @@ func _on_piece_overlap(other_id: int, id: int):
 	var other_id_group_key = -1
 	
 	#check if the overlap is a bust
-	if is_corner(all_shapes[other_id].return_base_and_pos()["abs base vertices"], 
-				 all_shapes[id].return_base_and_pos()["abs base vertices"]):
-		#sdf(other_id, "'s corners touch ", id)
-		return
+	#if is_corner(all_shapes[other_id].return_base_and_pos()["abs base vertices"], 
+				 #all_shapes[id].return_base_and_pos()["abs base vertices"]):
+		##sdf(other_id, "'s corners touch ", id)
+		#return
 	
 	# Find group keys for both ids
 	for key in overlap_groups:
