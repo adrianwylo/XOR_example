@@ -8,10 +8,8 @@ collision_mask = 2
 script = ExtResource("1_ipv7j")
 
 [node name="col" type="CollisionPolygon2D" parent="."]
-visible = false
 
 [node name="pol" type="Polygon2D" parent="."]
-visible = false
 
 [connection signal="area_shape_entered" from="." to="." method="_on_area_shape_entered"]
 [connection signal="area_shape_exited" from="." to="." method="_on_area_shape_exited"]

@@ -91,10 +91,10 @@ class Vertex:
 #final info datatype passed to playable_pieces scene
 class playable_metadata:
 	var vertices: Array
-	var tl: Vector2
-	var br: Vector2
+	var tl: Vector2i
+	var br: Vector2i
 	
-	func _init(vertex_array: Array, top_left: Vector2, bottom_right: Vector2) -> void:
+	func _init(vertex_array: Array, top_left: Vector2i, bottom_right: Vector2i) -> void:
 		vertices = vertex_array
 		tl = top_left
 		br = bottom_right
@@ -350,7 +350,7 @@ func create_packed_array(Vertices: Array, Position: Vector2i) -> playable_metada
 	return final
 
 #returns tl and br from array of vertices
-func find_tl_br(Vertices) -> Array:
+func find_tl_br(Vertices: Array) -> Array:
 	var t = Vertices[0].y
 	var b = Vertices[0].y
 	var l = Vertices[0].y
@@ -380,6 +380,43 @@ func create_sol_pos_dic(info: Dictionary, node_count: int) -> Dictionary:
 			final_dic[str(x)][str(y)] = node_pos
 	return final_dic
 
+#returns tl and br for an array of array of vertices
+func find_all_tl_br(metadatas: Array) -> Array:
+	var t = metadatas[0].tl.y
+	var b = metadatas[0].br.y
+	var l = metadatas[0].tl.x
+	var r = metadatas[0].br.x
+	for metadata in metadatas:
+		print("curtlbr:", [Vector2i(l,t),Vector2i(r,b)])
+		print("tl:", metadata.tl)
+		print("br:", metadata.br)
+		t = min(t, metadata.tl.y)
+		b = max(b, metadata.br.y)
+		l = min(l, metadata.tl.x)
+		r = max(r, metadata.br.x)
+	return [Vector2i(l,t),Vector2i(r,b)]
+
+#surmises node count for solution display to maximize siz of display
+func find_node_count(metadatas: Array) -> int:
+	var tlbr = find_all_tl_br(metadatas)
+	var size_vector: Vector2i = tlbr[1] - tlbr[0]
+	return 1 + max(size_vector.x, size_vector.y)
+
+#shifts all vertices within metadata by a position vector (subtraction)
+func shift_metadata(metadatas: Array, solution_pos_offsets: Vector2i) -> Array:
+	var final_metadata = []
+	for metadata in metadatas:
+		var shifted_vertices = []
+		for vector in metadata.vertices:
+			print("old vec: ", vector)
+			var new_vec = Vector2i(vector.x,vector.y) - solution_pos_offsets
+			print("new vec: ", new_vec)
+			shifted_vertices.append(new_vec)
+		var new_metadata = playable_metadata.new(shifted_vertices,metadata.tl-solution_pos_offsets, metadata.br-solution_pos_offsets)
+		final_metadata.append(new_metadata)
+	return final_metadata
+		
+
 #script call
 func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_pos_dic: Variant, solution_pos_info: Variant) -> void:
 	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------vv
@@ -393,40 +430,49 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_p
 	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------^^
 	
 	#for now shapes created will involve 9 shapes:
-	playable_shapes_metadata = [playable_metadata.new([Vector2(0,0),
-											 Vector2(3,0),
-											 Vector2(3,3),
-											 Vector2(2,3),
-											 Vector2(2,1),
-											 Vector2(1,1),
-											 Vector2(1,3),
-											 Vector2(0,3)],
-											 Vector2(0,0),
-											 Vector2(3,3)),
-					  #playable_metadata.new([Vector2(5,0),
-											 #Vector2(6,0),
-											 #Vector2(6,1),
-											 #Vector2(5,1)], 
-											 #Vector2(5,0),
-											 #Vector2(6,1)),
-					  #playable_metadata.new([Vector2(0,5),
-											 #Vector2(0,7),
-											 #Vector2(2,7),
-											 #Vector2(2,5)], 
-											 #Vector2(0,5),
-											 #Vector2(2,7)),
-					  playable_metadata.new([Vector2(3,5),
-											 Vector2(3,8),
-											 Vector2(5,8),
-											 Vector2(5,5)], 
-											 Vector2(3,5),
-											 Vector2(5,8)),
-					  playable_metadata.new([Vector2(4,5),
-											 Vector2(4,8),
-											 Vector2(6,8),
-											 Vector2(6,5)], 
-											 Vector2(4,5),
-											 Vector2(6,8))]
+	playable_shapes_metadata = [playable_metadata.new([Vector2(5,0),
+											 Vector2(8,0),
+											 Vector2(8,3),
+											 Vector2(7,3),
+											 Vector2(7,1),
+											 Vector2(6,1),
+											 Vector2(6,3),
+											 Vector2(5,3)],
+											 Vector2(5,0),
+											 Vector2(8,3)),
+					  playable_metadata.new([Vector2(10,0),
+											 Vector2(11,0),
+											 Vector2(11,1),
+											 Vector2(10,1)], 
+											 Vector2(10,0),
+											 Vector2(11,1)),
+					  playable_metadata.new([Vector2(5,5),
+											 Vector2(5,7),
+											 Vector2(7,7),
+											 Vector2(7,5)], 
+											 Vector2(5,5),
+											 Vector2(7,7)),
+					  playable_metadata.new([Vector2(8,5),
+											 Vector2(8,8),
+											 Vector2(10,8),
+											 Vector2(10,5)], 
+											 Vector2(8,5),
+											 Vector2(10,8)),
+					  playable_metadata.new([Vector2(9,5),
+											 Vector2(9,8),
+											 Vector2(11,8),
+											 Vector2(11,5)], 
+											 Vector2(9,5),
+											 Vector2(11,8))]
 
 	emit_signal("create_pieces", playable_shapes_metadata, playable_pos_dic)
-	emit_signal("display_solution",playable_shapes_metadata, create_sol_pos_dic(solution_pos_info, 16))
+	
+	var solution_shapes_metadata = playable_shapes_metadata
+	var solution_pos_offsets = find_all_tl_br(solution_shapes_metadata)[0]
+	solution_shapes_metadata = shift_metadata(solution_shapes_metadata, solution_pos_offsets)
+	var solution_pos_dic = create_sol_pos_dic(solution_pos_info, find_node_count(solution_shapes_metadata))
+	
+	print("solution_pos_offsets:", solution_pos_offsets)
+	print("solution_pos_dic:", solution_pos_dic)
+	
+	emit_signal("display_solution",solution_shapes_metadata, solution_pos_dic)
