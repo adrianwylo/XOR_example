@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://dhnmaakqdptlo"]
+[gd_scene load_steps=9 format=3 uid="uid://dhnmaakqdptlo"]
 
 [ext_resource type="PackedScene" uid="uid://ck6flabpfj65y" path="res://Playable Shape Scene/playable_shape.tscn" id="1_1w1ic"]
 [ext_resource type="Script" path="res://Main Scene/main.gd" id="1_yesy6"]
@@ -6,6 +6,8 @@
 [ext_resource type="Script" path="res://Main Scene/grid_pieces.gd" id="4_nvdvr"]
 [ext_resource type="Script" path="res://Main Scene/playable_pieces.gd" id="5_jxtif"]
 [ext_resource type="Script" path="res://Main Scene/solution.gd" id="6_0c0vp"]
+[ext_resource type="Script" path="res://Main Scene/solution_shapes.gd" id="7_vdlfd"]
+[ext_resource type="PackedScene" uid="uid://b3w8mbmlaek8r" path="res://Solution Shape Scene/solution_shape.tscn" id="8_rdlva"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_yesy6")
@@ -25,9 +27,9 @@ new_shape = ExtResource("1_1w1ic")
 [node name="Solution" type="Node2D" parent="."]
 script = ExtResource("6_0c0vp")
 
-[node name="Solution_Grid" type="Node2D" parent="Solution"]
-
 [node name="Solution_Shapes" type="Node2D" parent="Solution"]
+script = ExtResource("7_vdlfd")
+new_shape = ExtResource("8_rdlva")
 
 [connection signal="init_grid" from="." to="Grid_Pieces" method="_on_main_init_grid"]
 [connection signal="init_solution" from="." to="Solution" method="_on_main_init_solution"]
@@ -37,3 +39,4 @@ script = ExtResource("6_0c0vp")
 [connection signal="timeout" from="playable_pieces/Timer" to="playable_pieces" method="_on_lock_timer_timeout"]
 [connection signal="timeout" from="playable_pieces/testTimer" to="playable_pieces" method="_on_test_timer_timeout"]
 [connection signal="create_pieces" from="Solution" to="playable_pieces" method="_on_solution_create_pieces"]
+[connection signal="display_solution" from="Solution" to="Solution/Solution_Shapes" method="_on_solution_display_solution"]

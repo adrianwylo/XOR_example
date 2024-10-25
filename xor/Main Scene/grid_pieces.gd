@@ -5,77 +5,80 @@ extends Node2D
 #variables for graph creation---------------------------------------------------
 #screen size
 var screen_size
-#scale used to determine sizes of nodes
-var size_scale
 #proportion of grid side that is left/topmost margin (must be between 0 and .5)
 var margin_size
 # amount of nodes on one side of the grid (must be greater than 1)
 var node_count
-#dictionary of all grid positions: 
-var pos_dic = {}
-#length of one grid cell
-var len_of_cell
+#dictionary of all grid positions for playable pieces: 
+var playable_pos_dic = {}
+#dictionary of all grid positions for solution display:
+var solution_pos_dic_info 
 #-------------------------------------------------------------------------------
 
 #signal for completion
-signal grid_done(pos_dic)
+signal grid_done(playable_pos_dic)
 
 signal snap_info(grid_pos)
-
-# Called when the node enters the scene tree for the first time.
-func _ready() -> void:
-	
-	pass # Replace with function body.
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass
 
 # Called by main
 func _on_main_init_grid(n_c, s_s, m_s) -> void:
 	node_count = n_c
 	screen_size = s_s
 	margin_size = m_s
-	create_grid()
-	emit_signal("grid_done", pos_dic)
-	
-	
+	create_grids()
+	emit_signal("grid_done", playable_pos_dic, solution_pos_dic_info)
+
 #1. creates the child nodes to make up grid
-#2. populates pos_dic:
+#2. populates playable_pos_dic:
 #   {x_index:"{y_index: (x_coor, y_coor), ...}, ...}
-func create_grid() -> void:	
+func create_grids() -> void:	
+	#Code right now expects that the orientation is horizontal
+	#decide scale of nodes with reference to screen size
+	var size_scale = node_count * 0.001 #THIS IS A MAGIC NUMBER
+	
 	#counting margins, length of one side of grid
-	var grid_size_m = min(screen_size.x, screen_size.y)
-	var grid_offset = Vector2i((screen_size.x - grid_size_m)/2, 
-							  (screen_size.y - grid_size_m)/2)
+	var playable_grid_size_full = screen_size.y
+	#offset of playable grid from top left
+	var playable_grid_offset = Vector2i((screen_size.x - playable_grid_size_full)/2, 0)
 	
 	#not counting margins, length of one side of full grid
-	var grid_size = grid_size_m * (1 - margin_size*2)
-	var margin_offset = Vector2i(grid_size*margin_size, grid_size*margin_size)
+	var playable_grid_size_nodes = playable_grid_size_full * (1 - margin_size*2)
+	
+	#additional margins because of offset
+	var margin_offset = Vector2i(playable_grid_size_nodes * margin_size, playable_grid_size_nodes * margin_size)
 	
 	#changes position of grid
-	grid_offset += margin_offset
-	len_of_cell = int(grid_size/(node_count-1))
+	playable_grid_offset += margin_offset
+	var len_of_playable_cell = int(playable_grid_size_nodes/(node_count-1))
 	
-	
-	#decide scale of nodes with reference to screen size
-	size_scale = 0.02#temp placeholder
-	
+		
 	#added 2 to contribute to the a buffer 
 	for x in range(0, node_count):
-		pos_dic[str(x)] = {}
+		playable_pos_dic[str(x)] = {}
 		for y in range(0, node_count):
 			var is_edge = (x == node_count - 1 or y == node_count - 1)
 			#(- 1 because includes 2 divisions = 3 points)
-			var node_pos = len_of_cell * Vector2i(x,y) + grid_offset
-			pos_dic[str(x)][str(y)] = node_pos
+			var node_pos = len_of_playable_cell * Vector2i(x,y) + playable_grid_offset
+			playable_pos_dic[str(x)][str(y)] = node_pos
 			
 			#create node as child
 			var node = new_node.instantiate()
 			node.position = node_pos
-			node.initialize_data(size_scale, len_of_cell, Vector2i(int(x),int(y)), is_edge)
+			node.initialize_data(size_scale, len_of_playable_cell, Vector2i(int(x),int(y)), is_edge)
 			add_child(node)
-
+			
+	#data needed for the solution display:
+	#this will be shared with the grid offset
+	var solution_grid_margin_size = margin_offset.x
+	#size of solution_grid_w/o margins
+	var solution_grid_size_nodes = (screen_size.x - playable_grid_size_full)/2 - solution_grid_margin_size
+	#offset of solution grid
+	var solution_grid_offset = Vector2i(int(screen_size.x - (screen_size.x - playable_grid_size_full)/2), 
+										int((screen_size.y - solution_grid_size_nodes)/2))
+	solution_pos_dic_info = {
+		"length" = solution_grid_size_nodes,
+		"offset" = solution_grid_offset
+	}
 #query children for a snap
 func _on_playable_pieces_snap(id: Variant, corner_pos: Variant, area_offset: Variant) -> void:
 	var bot_right_pos = corner_pos + area_offset

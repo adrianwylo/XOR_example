@@ -12,14 +12,15 @@ var screen_size
 var margin_size = 0.1
 # amount of nodes on one side of the grid (must be greater than 1) 
 #(Enact a min limit for effectiveness of puzzle)
-var node_count = 15
+var node_count = 16
 
 #-------------------------------------------------------------------------------
-
 #true if grid created
 var grid_done = false
 #dictionary of all grid positions populated from grid_peices 
 var map 
+#information about creating map for solution display
+var sol_info
 
 #variables passed into shape creation-------------------------------------------
 #must 1 to 5 where 5 (easy to hard)
@@ -32,16 +33,19 @@ func _ready() -> void:
 	assert(margin_size < .5, "margins too big, no space for the nodes!")
 	screen_size = get_viewport_rect().size
 	emit_signal("init_grid", node_count, screen_size, margin_size)
+	
 	while not grid_done: #don't know if this is good logic
 		print("waiting for grid to finish")
 	assert(difficulty > 0 and difficulty < 6, "outside difficulty range!")
 	#create math behind correct solution and generates all pieces
-	emit_signal("init_solution", node_count, difficulty, map)
+	
+	emit_signal("init_solution", node_count, difficulty, map, sol_info)
+	
 
 
 
-
-func _on_grid_pieces_grid_done(pos_dic: Variant) -> void:
+func _on_grid_pieces_grid_done(pos_dic: Variant, sol_dic_info: Variant) -> void:
 	grid_done = true
 	map = pos_dic
+	sol_info = sol_dic_info
 	

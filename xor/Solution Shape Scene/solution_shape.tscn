@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3w8mbmlaek8r"]
+
+[ext_resource type="Script" path="res://Solution Shape Scene/solution_shape.gd" id="1_ipv7j"]
+
+[node name="Solution_shape" type="Area2D"]
+collision_layer = 2
+collision_mask = 2
+script = ExtResource("1_ipv7j")
+
+[node name="col" type="CollisionPolygon2D" parent="."]
+visible = false
+
+[node name="pol" type="Polygon2D" parent="."]
+visible = false
+
+[connection signal="area_shape_entered" from="." to="." method="_on_area_shape_entered"]
+[connection signal="area_shape_exited" from="." to="." method="_on_area_shape_exited"]

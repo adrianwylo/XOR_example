@@ -1,16 +1,13 @@
 extends Area2D
 
 # Reference to the 2D nodes:
-@onready var base_col2d = $click_col2d
-@onready var base_pol2d = $base_pol2d
+@onready var base_col2d = $col
+@onready var base_pol2d = $pol
 
 #parent node for signal management:
 var playable_pieces
 
 #signal calls to parent:
-signal occupy_drag(identity)
-signal free_drag(identity, click_location)
-signal continue_q(identity)
 signal overlapping(other_id, my_id)
 signal not_overlapping(other_id, my_id)
 
@@ -28,10 +25,6 @@ var base_shape_vertices
 
 #current metadata 
 var grid_coor
-#boolean value is shape being dragged?
-var dragging = false
-#boolean for is snapping?
-var snapping = false
 #upon dragging, tracks offset from corner for snapping
 var mouse_offset
 #target for linear interpolation
@@ -60,20 +53,13 @@ var max_speed: float = 250 # Set your desired maximum speed
 var smooth_factor: float = 0.1  # Time to reach the target position
 var velocity: Vector2 = Vector2.ZERO  # Velocity to keep track of the current speed
 
-#collection of active collisions based on detection of area_shape enter and exit
-var collision_tracker 
-
 #region Collision Detectors
 #handlers for noting collision
 func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
 	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
 	var other_node_id = other_shape_node.return_id()
-	if collision_tracker.has(other_node_id):
-		collision_tracker[other_node_id] += 1
-	else:
-		collision_tracker[other_node_id] = 1	
-	#print()
-	#print(identity, " entering ", other_node_id)
+	print()
+	print(identity, " entering ", other_node_id)
 	emit_signal("overlapping", other_node_id, identity)
 		
 
@@ -81,12 +67,8 @@ func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, 
 func _on_area_shape_exited(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
 	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
 	var other_node_id = other_shape_node.return_id()
-	#print(identity, " exiting ", other_node_id)
-	if collision_tracker.has(other_node_id):
-		if collision_tracker[other_node_id] - 1 == 0:
-			collision_tracker.erase(other_node_id)
-			emit_signal("not_overlapping",other_node_id , identity)
-	
+	print(identity, " exiting ", other_node_id)
+	emit_signal("not_overlapping",other_node_id , identity)
 #endregion
 
 #region report functions
@@ -106,6 +88,17 @@ func return_base_and_pos() -> Dictionary:
 		"abs base vertices": PackedVector2Array(abs_vertices),
 		"position": position
 	}
+
+#checks if two shapes share a vertice
+func shared_vertices(shape1: Array, shape2: Array) -> int:
+	# Iterate over vertices in shape1
+	var shared_no = 0
+	for vertex1 in shape1:
+		# Check if the vertex is also in shape2
+		for vertex2 in shape2:
+			if vertex2 == vertex1:
+				shared_no+=1  # Shared vertex found
+	return shared_no # No shared vertices found
 #endregion
 
 
@@ -479,39 +472,13 @@ func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_
 	return outline.slice(0, injection_index + 1) + hole + outline.slice(injection_index, outline.size())
 #endregion
 
-#region Corner checker
-#checks if two shapes exclusively share corners
-func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
-	var no_shared_vert = shared_vertices(shape1, shape2)
-	if no_shared_vert == 0:
-		return false
-	var intersected_polygons = Geometry2D.intersect_polygons(shape1, shape2)
-	var merge_polygons =  Geometry2D.merge_polygons(shape1, shape2)
-	if intersected_polygons.size() == 0 and merge_polygons.size() == 2:
-		return true
-	return false
-
-#checks if two shapes share a vertice
-func shared_vertices(shape1: Array, shape2: Array) -> int:
-	# Iterate over vertices in shape1
-	var shared_no = 0
-	for vertex1 in shape1:
-		# Check if the vertex is also in shape2
-		for vertex2 in shape2:
-			if vertex2 == vertex1:
-				shared_no+=1  # Shared vertex found
-	return shared_no # No shared vertices found
-#endregion
 
 #region Initialization Functions
 #Called when the node enters the scene tree for the first time.
 func _ready() -> void:
-	collision_tracker = {}
 	#parent connections
 	playable_pieces = get_parent()
 	if playable_pieces:
-		playable_pieces.connect("go", _start_dragging)
-		playable_pieces.connect("start_snap", _stop_dragging)
 		playable_pieces.connect("display_group", _show_group)
 		playable_pieces.connect("no_display_group", _no_show_group)
 	identity = get_index()
@@ -522,10 +489,7 @@ func _ready() -> void:
 	
 	# for movement bounds
 	screen_size = Vector2i(get_viewport_rect().size)
-	
 	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
-	
-	
 	
 	# create base shape
 	#NOTE the coordinates passsed in here are relative to the position already
@@ -566,42 +530,6 @@ func pol_coor_to_px(vertices: PackedVector2Array, offset: Vector2) -> PackedVect
 	return converted
 #endregion
 
-#region Piece Move Functions
-#Click event handler
-func _input(event: InputEvent) -> void:
-	click_event = event
-	if event is InputEventMouseButton and event.button_index == 1 and event.pressed:
-		if dragging == true:
-			emit_signal("free_drag", identity, event.position - mouse_offset, coor_to_px(br_pos - Vector2i(1,1)) - coor_to_px(tl_pos))
-		else:
-			if Geometry2D.is_point_in_polygon(to_local(event.position), base_col2d.polygon):
-				#request to start dragging
-				#sdf()
-				#sdf(str(identity) +" wants to move from grid index " + str(grid_coor))
-				mouse_offset = event.position-position
-				emit_signal("occupy_drag", identity)
-
-#reacts to go ack
-func _start_dragging(id):
-	if id == identity:
-		dragging = true
-		drag_offset = position - click_event.position
-
-#reacts to stop ack
-func _stop_dragging(grid_pos, id):
-	if id == identity:
-		dragging = false
-		snap_to_grid(grid_pos)
-		#processing of metadata from snap 
-		grid_coor = grid_pos
-		emit_signal("continue_q", identity)
-		#sdf(str(identity) +" has stopped at grid index " + str(grid_coor))
-
-#facilitates the animation of snapping to grid
-func snap_to_grid(grid_pos):
-	snap_target = coor_to_px(grid_pos)
-	snapping = true
-
 #clamps shape movement and modifies children
 func _physics_process(delta: float) -> void:
 	#display related -------------------------------------------------------------------------------
@@ -618,15 +546,4 @@ func _physics_process(delta: float) -> void:
 		for i in range(get_child_count() - 1, 1, -1):  # Iterate backward to avoid index issues
 			var child_node = get_child(i)
 			remove_child(child_node)  # or child_node.queue_free() to free memory	
-	#interaction related ---------------------------------------------------------------------------
-	if snapping:
-		position = position.lerp(snap_target, snap_speed * delta)
-		if position.distance_to(snap_target) < 1.0:
-			position = snap_target
-			snapping = false  # Stop snapping after reaching the target
-	if dragging:
-		var target_position = get_global_mouse_position() + drag_offset
-		target_position = target_position.clamp(Vector2.ZERO, screen_size - area_offset)
-		position = position.lerp(target_position, smooth_factor)
-		position = position.clamp(Vector2.ZERO, screen_size - area_offset)
 #endregion
