@@ -99,20 +99,42 @@ class playable_metadata:
 	var vertices: Array
 	var tl: Vector2i
 	var br: Vector2i
+	var area: float
 	
-	func _init(vertex_array: Array, top_left: Vector2i, bottom_right: Vector2i) -> void:
+	func _init(vertex_array: Array) -> void:
 		vertices = vertex_array
-		tl = top_left
-		br = bottom_right
+		var tlbr = find_tl_br()
+		tl = tlbr[0]
+		br = tlbr[1]
+		area = calculate_area()
 	
-	#returns area from the shapes
+	func find_tl_br() -> Array:
+		var t = vertices[0].y
+		var b = vertices[0].y
+		var l = vertices[0].x
+		var r = vertices[0].x
+		for vertex in vertices:
+			var x = vertex.x
+			var y = vertex.y
+			if y<t:
+				t = y
+			if y>b:
+				b = y
+			if x>r:
+				r = x
+			if x<l:
+				l = x
+		return [Vector2i(l,t),Vector2i(r,b)]
+	
+	# Returns the area of the shape defined by vertices
 	func calculate_area() -> float:
 		var result = 0.0
 		var num_vertices = vertices.size()
 		for q in range(num_vertices):
-			var p = (q - 1 + num_vertices) % num_vertices
-			result += vertices[q].cross(vertices[p])
+			var p = (q + 1) % num_vertices
+			result += (vertices[q].x * vertices[p].y - vertices[q].y * vertices[p].x)
 		return abs(result) * 0.5
+
 
 #variables for solution creation------------------------------------------------
 #must be creater than 0
@@ -136,8 +158,6 @@ var shape_areas
 #array of array of vertices that make up polygon
 var mapped_shapes
 
-#array of metadata for playable pieces
-var playable_shapes_metadata
 
 var display_metadata
 
@@ -208,21 +228,16 @@ func find_node_count(metadatas: Array) -> int:
 func shift_metadata(metadatas: Array, solution_pos_offsets: Vector2i) -> Array:
 	var final_metadata = []
 	for metadata in metadatas:
-		var shifted_vertices = []
-		for vector in metadata.vertices:
-			#print("old vec: ", vector)
-			var new_vec = Vector2i(vector.x,vector.y) + solution_pos_offsets
-			#print("new vec: ", new_vec)
-			shifted_vertices.append(new_vec)
-		var new_metadata = playable_metadata.new(shifted_vertices,metadata.tl+solution_pos_offsets, metadata.br+solution_pos_offsets)
+		var shifted_vertices = shift_shape(metadata.vertices, solution_pos_offsets)
+		var new_metadata = playable_metadata.new(shifted_vertices)
 		final_metadata.append(new_metadata)
 	return final_metadata
 
 #create a new shape from an original shape shifted by position
-func shift_shape(vertices: Array, position: Vector2i) -> Array:
+func shift_shape(vertices: Array, pos_offset: Vector2i) -> Array:
 	var shifted_vertices = []
 	for vertex in vertices:
-		var shifted_vert = Vector2i(vertex.x, vertex.y) + position
+		var shifted_vert = Vector2i(vertex.x, vertex.y) + pos_offset
 		shifted_vertices.append(shifted_vert)
 	return shifted_vertices
 
@@ -239,17 +254,13 @@ func create_solution(playable_shapes_metadata: Array, node_count: int) -> Array:
 			#might wanna check this math im watching tv
 			#this ensures that the new vector is within the bounds found from the shape
 			var new_position = Vector2i(randi_range(0,node_count - shape_size_vector.x - 1),randi_range(0,node_count - shape_size_vector.y - 1))
-			print("new_position = ", new_position)
+			#print("new_position = ", new_position)
 			var new_shape = shift_shape(metadata.vertices,new_position - metadata.tl)
-			
-			print("new shape is ", new_shape)
-	
+			#print("new shape is ", new_shape)
 			#establish vertex overlaps needed to add new random shape
 			var no_of_overlaps_needed = solution.size() - 3
 			if no_of_overlaps_needed < 1:
 				no_of_overlaps_needed = 1
-			print("need ", no_of_overlaps_needed, " overlaps!")
-			
 			#count of how many 
 			var no_of_overlaps = 0
 			for past_shape_metadata in solution:
@@ -264,23 +275,45 @@ func create_solution(playable_shapes_metadata: Array, node_count: int) -> Array:
 									if randf() <= 0.30:
 										vertex_in_past_shape = true
 										break
-						
-						
 				if vertex_in_past_shape:
 					no_of_overlaps += 1
-			
 			if no_of_overlaps >= no_of_overlaps_needed or solution.size() == 0:
 				var tlbr = find_tl_br(new_shape)
-				working_metadata = playable_metadata.new(new_shape,tlbr[0],tlbr[1])
+				working_metadata = playable_metadata.new(new_shape)
 				new_shape_fits = true
 		solution.append(working_metadata)
 	return solution
 
-#converts coordinate in graph into a string for identification
-func coor_to_string(coordinate: Vector2i) -> String:
-	return str(coordinate.x) + ',' + str(coordinate.y)
-	
-
+#creates the new playable_metadata objects in array such that they don't overlap
+func create_playable(list_of_shapes: Array, node_count: int) -> Array:
+	#eventual list of playable_metadata objects
+	var final = []
+	for shape in list_of_shapes:
+		var clear = false
+		while not clear:
+			var old_tlbr = find_tl_br(shape)
+			var shape_size_vector: Vector2i = old_tlbr[1] - old_tlbr[0]
+			var new_position = Vector2i(randi_range(0,node_count - shape_size_vector.x - 1),randi_range(0,node_count - shape_size_vector.y - 1))
+			
+			#new shape with the corrected vertices
+			var new_shape = shift_shape(shape,new_position - old_tlbr[0])
+			#iterates through all shapes to see if there is an overlap
+			var no_collisions = true
+			for prev_shape in final:
+				var are_overlaps = false
+				for vertex in new_shape:
+					if Geometry2D.is_point_in_polygon(vertex, prev_shape.vertices):
+						are_overlaps = true
+						break
+				if are_overlaps:
+					no_collisions = false
+					break
+			if no_collisions:
+				final.append(playable_metadata.new(new_shape))
+				clear = true
+	return final
+			
+		
 #takes the list of playable metadata, and returns a nested dictionary
 #of solution's relative distances
 #{point 1:{point 2: vector difference, .........}, .....}
@@ -296,8 +329,16 @@ func make_solution_metadata(metadatas: Array) -> Dictionary:
 			new_dic[key2] = second_top_left_coor - first_top_left_coor
 		final_dic[key1] = new_dic
 	return final_dic
-		
 
+
+#reorders list of playable_metadata objects based on area (smaller area = higher index) 
+func sort_by_area(metadata_list: Array) -> Array:
+	print(metadata_list)
+	var final_metadata = metadata_list
+	final_metadata.sort_custom(func(a, b): return a.area > b.area)
+	print(final_metadata)
+	return final_metadata
+	
 #script call
 func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_pos_dic: Variant, solution_pos_info: Variant) -> void:
 	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------vv
@@ -311,42 +352,15 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_p
 	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------^^
 	
 	#for now shapes created will involve 9 shapes:
-	playable_shapes_metadata = [playable_metadata.new([Vector2(5,0),
-											 Vector2(8,0),
-											 Vector2(8,3),
-											 Vector2(7,3),
-											 Vector2(7,1),
-											 Vector2(6,1),
-											 Vector2(6,3),
-											 Vector2(5,3)],
-											 Vector2(5,0),
-											 Vector2(8,3)),
-					  playable_metadata.new([Vector2(10,0),
-											 Vector2(11,0),
-											 Vector2(11,1),
-											 Vector2(10,1)], 
-											 Vector2(10,0),
-											 Vector2(11,1)),
-					  playable_metadata.new([Vector2(5,5),
-											 Vector2(5,7),
-											 Vector2(7,7),
-											 Vector2(7,5)], 
-											 Vector2(5,5),
-											 Vector2(7,7)),
-					  playable_metadata.new([Vector2(8,5),
-											 Vector2(8,8),
-											 Vector2(10,8),
-											 Vector2(10,5)], 
-											 Vector2(8,5),
-											 Vector2(10,8)),
-					  playable_metadata.new([Vector2(9,5),
-											 Vector2(9,8),
-											 Vector2(11,8),
-											 Vector2(11,5)], 
-											 Vector2(9,5),
-											 Vector2(11,8))]
+	var playable_shapes = [[Vector2(5,0),Vector2(8,0),Vector2(8,3),Vector2(7,3),Vector2(7,1),Vector2(6,1),Vector2(6,3),Vector2(5,3)],
+					  				[Vector2(10,0),Vector2(11,0),Vector2(11,1),Vector2(10,1)],
+									[Vector2(4,5),Vector2(4,7),Vector2(6,7),Vector2(6,5)],
+									[Vector2(7,5),Vector2(7,8),Vector2(9,8),Vector2(9,5)],
+									[Vector2(10,5),Vector2(10,8),Vector2(12,8),Vector2(12,5)]]
 	
+	var playable_shapes_metadata = create_playable(playable_shapes, node_count)
 	
+	playable_shapes_metadata = sort_by_area(playable_shapes_metadata)
 	
 	#processing of solution_shapes dictionary
 	var solution_shapes_metadata = create_solution(playable_shapes_metadata, node_count)

@@ -459,7 +459,7 @@ func check_if_correct() -> int:
 					var found_displacement = correctness[tl1_key][tl2_key]
 					if found_displacement == displacement:
 						correct += 1
-	print(correct,"/",total)
+	#print(correct,"/",total)
 	return round(10 * correct / total)
 #detects whether there is a phony collision
 #func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
