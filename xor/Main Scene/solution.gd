@@ -1,8 +1,14 @@
 extends Node2D
 #Generate the solutions and thus the logic behind all assets
 
-signal create_pieces(shape_pieces, position_dictionary)
+#for debuging
+@export var new_node: PackedScene
+
+signal create_pieces(shape_pieces, position_dictionary, correctness_dic)
 signal display_solution(solution_pieces, position_dictionary)
+
+#nested dictionary organized by 
+var correctness
 
 #scale of 1 to 5
 var diff_max = 5
@@ -98,7 +104,15 @@ class playable_metadata:
 		vertices = vertex_array
 		tl = top_left
 		br = bottom_right
-		
+	
+	#returns area from the shapes
+	func calculate_area() -> float:
+		var result = 0.0
+		var num_vertices = vertices.size()
+		for q in range(num_vertices):
+			var p = (q - 1 + num_vertices) % num_vertices
+			result += vertices[q].cross(vertices[p])
+		return abs(result) * 0.5
 
 #variables for solution creation------------------------------------------------
 #must be creater than 0
@@ -126,8 +140,237 @@ var mapped_shapes
 var playable_shapes_metadata
 
 var display_metadata
+
+
 #WILL BE MORE... (consolidate difficulty rating within this function)
 #-------------------------------------------------------------------------------
+#returns tl and br from array of vertices
+func find_tl_br(Vertices: Array) -> Array:
+	var t = Vertices[0].y
+	var b = Vertices[0].y
+	var l = Vertices[0].x
+	var r = Vertices[0].x
+	for vertex in Vertices:
+		var x = vertex.x
+		var y = vertex.y
+		if y<t:
+			t = y
+		if y>b:
+			b = y
+		if x>r:
+			r = x
+		if x<l:
+			l = x
+	return [Vector2i(l,t),Vector2i(r,b)]
+
+#using the info from grid_pieces and the node count, creates dictionary mapping
+#index to position on solutions display
+func create_sol_pos_dic(info: Dictionary, node_count: int) -> Dictionary:
+	var len_of_playable_cell = int(info["length"]/(node_count-1))
+	var final_dic = {}
+	for x in range(0, node_count):
+		final_dic[str(x)] = {}
+		for y in range(0, node_count):
+			var node_pos = len_of_playable_cell * Vector2i(x,y) + info["offset"]
+			final_dic[str(x)][str(y)] = node_pos
+			#create node as child
+			#FOR DEBUGGING
+			#var node = new_node.instantiate()
+			#node.position = node_pos
+			#node.initialize_data(0.01, len_of_playable_cell, Vector2i(int(x),int(y)), true)
+			#add_child(node)
+	return final_dic
+
+#returns tl and br for an array of playable metadata objects
+func find_all_tl_br(metadatas: Array) -> Array:
+	var t = metadatas[0].tl.y
+	var b = metadatas[0].br.y
+	var l = metadatas[0].tl.x
+	var r = metadatas[0].br.x
+	for metadata in metadatas:
+		print("curtlbr:", [Vector2i(l,t),Vector2i(r,b)])
+		print("tl:", metadata.tl)
+		print("br:", metadata.br)
+		t = min(t, metadata.tl.y)
+		b = max(b, metadata.br.y)
+		l = min(l, metadata.tl.x)
+		r = max(r, metadata.br.x)
+	print("final tlbr ",  [Vector2i(l,t),Vector2i(r,b)])
+	return [Vector2i(l,t),Vector2i(r,b)]
+
+#surmises node count for solution display to maximize siz of display
+func find_node_count(metadatas: Array) -> int:
+	var tlbr = find_all_tl_br(metadatas)
+	var size_vector: Vector2i = tlbr[1] - tlbr[0]
+	return 1 + max(size_vector.x, size_vector.y)
+
+#shifts all vertices within metadata by a position vector 
+func shift_metadata(metadatas: Array, solution_pos_offsets: Vector2i) -> Array:
+	var final_metadata = []
+	for metadata in metadatas:
+		var shifted_vertices = []
+		for vector in metadata.vertices:
+			#print("old vec: ", vector)
+			var new_vec = Vector2i(vector.x,vector.y) + solution_pos_offsets
+			#print("new vec: ", new_vec)
+			shifted_vertices.append(new_vec)
+		var new_metadata = playable_metadata.new(shifted_vertices,metadata.tl+solution_pos_offsets, metadata.br+solution_pos_offsets)
+		final_metadata.append(new_metadata)
+	return final_metadata
+
+#create a new shape from an original shape shifted by position
+func shift_shape(vertices: Array, position: Vector2i) -> Array:
+	var shifted_vertices = []
+	for vertex in vertices:
+		var shifted_vert = Vector2i(vertex.x, vertex.y) + position
+		shifted_vertices.append(shifted_vert)
+	return shifted_vertices
+
+#creates a solution from playable_shapes_metadata
+func create_solution(playable_shapes_metadata: Array, node_count: int) -> Array:
+	var solution = []
+	for metadata in playable_shapes_metadata:
+		var new_shape_fits = false
+		var working_metadata
+		#NEED TO DEBUG
+		while not new_shape_fits:
+			#make a new shape
+			var shape_size_vector: Vector2i = metadata.br - metadata.tl
+			#might wanna check this math im watching tv
+			#this ensures that the new vector is within the bounds found from the shape
+			var new_position = Vector2i(randi_range(0,node_count - shape_size_vector.x - 1),randi_range(0,node_count - shape_size_vector.y - 1))
+			print("new_position = ", new_position)
+			var new_shape = shift_shape(metadata.vertices,new_position - metadata.tl)
+			
+			print("new shape is ", new_shape)
+	
+			#establish vertex overlaps needed to add new random shape
+			var no_of_overlaps_needed = solution.size() - 3
+			if no_of_overlaps_needed < 1:
+				no_of_overlaps_needed = 1
+			print("need ", no_of_overlaps_needed, " overlaps!")
+			
+			#count of how many 
+			var no_of_overlaps = 0
+			for past_shape_metadata in solution:
+				#find out if a point in the new shape is in a past_shape's region
+				var vertex_in_past_shape = false
+				for vertex in new_shape:
+					if Geometry2D.is_point_in_polygon(vertex, past_shape_metadata.vertices):
+						var past_shape_tlbr = find_tl_br(past_shape_metadata.vertices)
+						if Vector2i(past_shape_tlbr[1] - past_shape_tlbr[0]) != Vector2i(1,1):
+							for past_vertex in past_shape_metadata.vertices:
+								if vertex in past_shape_metadata.vertices:
+									if randf() <= 0.30:
+										vertex_in_past_shape = true
+										break
+						
+						
+				if vertex_in_past_shape:
+					no_of_overlaps += 1
+			
+			if no_of_overlaps >= no_of_overlaps_needed or solution.size() == 0:
+				var tlbr = find_tl_br(new_shape)
+				working_metadata = playable_metadata.new(new_shape,tlbr[0],tlbr[1])
+				new_shape_fits = true
+		solution.append(working_metadata)
+	return solution
+
+#converts coordinate in graph into a string for identification
+func coor_to_string(coordinate: Vector2i) -> String:
+	return str(coordinate.x) + ',' + str(coordinate.y)
+	
+
+#takes the list of playable metadata, and returns a nested dictionary
+#of solution's relative distances
+#{point 1:{point 2: vector difference, .........}, .....}
+func make_solution_metadata(metadatas: Array) -> Dictionary:
+	var final_dic = {}
+	for index1 in range(metadatas.size()):
+		var first_top_left_coor = metadatas[index1].tl
+		var key1 = index1+2
+		var new_dic = {}
+		for index2 in range(metadatas.size()):
+			var second_top_left_coor = metadatas[index2].tl
+			var key2 = index2+2
+			new_dic[key2] = second_top_left_coor - first_top_left_coor
+		final_dic[key1] = new_dic
+	return final_dic
+		
+
+#script call
+func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_pos_dic: Variant, solution_pos_info: Variant) -> void:
+	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------vv
+	#max_shape_count = node_count*2
+	#total_area = floor(node_count*node_count*0.9)
+	#process_difficulty(difficulty)
+	#map_shapes()
+	#AT THE MOMENT THESE ARE JUST RANDO SHAPES, BUT WE NEED PLAYABLE PIECES AND SOLUTION PIECES
+	#WHEN PASSED IN, THESE HAVE TO BE POSITIONS NOT JUST COORDINATES
+	#SHAPES WILL BE DRAWN WITH CLOCKWISE DIRECTION
+	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------^^
+	
+	#for now shapes created will involve 9 shapes:
+	playable_shapes_metadata = [playable_metadata.new([Vector2(5,0),
+											 Vector2(8,0),
+											 Vector2(8,3),
+											 Vector2(7,3),
+											 Vector2(7,1),
+											 Vector2(6,1),
+											 Vector2(6,3),
+											 Vector2(5,3)],
+											 Vector2(5,0),
+											 Vector2(8,3)),
+					  playable_metadata.new([Vector2(10,0),
+											 Vector2(11,0),
+											 Vector2(11,1),
+											 Vector2(10,1)], 
+											 Vector2(10,0),
+											 Vector2(11,1)),
+					  playable_metadata.new([Vector2(5,5),
+											 Vector2(5,7),
+											 Vector2(7,7),
+											 Vector2(7,5)], 
+											 Vector2(5,5),
+											 Vector2(7,7)),
+					  playable_metadata.new([Vector2(8,5),
+											 Vector2(8,8),
+											 Vector2(10,8),
+											 Vector2(10,5)], 
+											 Vector2(8,5),
+											 Vector2(10,8)),
+					  playable_metadata.new([Vector2(9,5),
+											 Vector2(9,8),
+											 Vector2(11,8),
+											 Vector2(11,5)], 
+											 Vector2(9,5),
+											 Vector2(11,8))]
+	
+	
+	
+	#processing of solution_shapes dictionary
+	var solution_shapes_metadata = create_solution(playable_shapes_metadata, node_count)
+	
+	#calculate the size of grid for creating solution display
+	var sol_dic_node_count = find_node_count(solution_shapes_metadata)
+	
+	#calculating 
+	var sol_tlbr = find_all_tl_br(solution_shapes_metadata)
+	
+	var size_vector: Vector2i = sol_tlbr[1] - sol_tlbr[0]
+	
+	#shift necessary for solution to be displayed in center
+	var shift_vec = Vector2i(ceil((sol_dic_node_count  - 1- size_vector.x)/2),floor((sol_dic_node_count  - 1 - size_vector.y)/2)) - sol_tlbr[0]
+	solution_shapes_metadata = shift_metadata(solution_shapes_metadata, shift_vec)
+	
+	
+	correctness = make_solution_metadata(solution_shapes_metadata)
+	var solution_pos_dic = create_sol_pos_dic(solution_pos_info, sol_dic_node_count)
+	
+	#call to create playable pieces
+	emit_signal("create_pieces", playable_shapes_metadata, playable_pos_dic,correctness)
+	#call to create solution display
+	emit_signal("display_solution", solution_shapes_metadata, solution_pos_dic)
 
 #region UNFINISHED DIFDFICULTY -> RANDOM SOLUTION FUNCTIONS
 #randomly chooses a direction (input = blacklisted options)
@@ -338,141 +581,3 @@ func map_shapes() -> void:
 			#calc edge possibilities
 			#update reference_pos
 #endregion
-
-#shift the shape and finds tl/br -> makes class for movement to playable_shape
-func create_packed_array(Vertices: Array, Position: Vector2i) -> playable_metadata:
-	var shifted_vertices: PackedVector2Array = []
-	for vertex in Vertices:
-		var shifted_vert = vertex + Position
-		shifted_vertices.append(shifted_vert)
-	var tlbr = find_tl_br(shifted_vertices)
-	var final = playable_metadata.new(shifted_vertices,tlbr[0],tlbr[1])
-	return final
-
-#returns tl and br from array of vertices
-func find_tl_br(Vertices: Array) -> Array:
-	var t = Vertices[0].y
-	var b = Vertices[0].y
-	var l = Vertices[0].y
-	var r = Vertices[0].y
-	for vertex in Vertices:
-		var x = vertex.x
-		var y = vertex.y
-		if y<t:
-			t = y
-		if y>b:
-			b = y
-		if x>r:
-			r = x
-		if x<l:
-			l = x
-	return [Vector2i(l,t),Vector2i(r,b)]
-
-#using the info from grid_pieces and the node count, creates dictionary mapping
-#index to position on solutions display
-func create_sol_pos_dic(info: Dictionary, node_count: int) -> Dictionary:
-	var len_of_playable_cell = int(info["length"]/(node_count-1))
-	var final_dic = {}
-	for x in range(0, node_count):
-		final_dic[str(x)] = {}
-		for y in range(0, node_count):
-			var node_pos = len_of_playable_cell * Vector2i(x,y) + info["offset"]
-			final_dic[str(x)][str(y)] = node_pos
-	return final_dic
-
-#returns tl and br for an array of array of vertices
-func find_all_tl_br(metadatas: Array) -> Array:
-	var t = metadatas[0].tl.y
-	var b = metadatas[0].br.y
-	var l = metadatas[0].tl.x
-	var r = metadatas[0].br.x
-	for metadata in metadatas:
-		print("curtlbr:", [Vector2i(l,t),Vector2i(r,b)])
-		print("tl:", metadata.tl)
-		print("br:", metadata.br)
-		t = min(t, metadata.tl.y)
-		b = max(b, metadata.br.y)
-		l = min(l, metadata.tl.x)
-		r = max(r, metadata.br.x)
-	return [Vector2i(l,t),Vector2i(r,b)]
-
-#surmises node count for solution display to maximize siz of display
-func find_node_count(metadatas: Array) -> int:
-	var tlbr = find_all_tl_br(metadatas)
-	var size_vector: Vector2i = tlbr[1] - tlbr[0]
-	return 1 + max(size_vector.x, size_vector.y)
-
-#shifts all vertices within metadata by a position vector (subtraction)
-func shift_metadata(metadatas: Array, solution_pos_offsets: Vector2i) -> Array:
-	var final_metadata = []
-	for metadata in metadatas:
-		var shifted_vertices = []
-		for vector in metadata.vertices:
-			print("old vec: ", vector)
-			var new_vec = Vector2i(vector.x,vector.y) - solution_pos_offsets
-			print("new vec: ", new_vec)
-			shifted_vertices.append(new_vec)
-		var new_metadata = playable_metadata.new(shifted_vertices,metadata.tl-solution_pos_offsets, metadata.br-solution_pos_offsets)
-		final_metadata.append(new_metadata)
-	return final_metadata
-		
-
-#script call
-func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_pos_dic: Variant, solution_pos_info: Variant) -> void:
-	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------vv
-	#max_shape_count = node_count*2
-	#total_area = floor(node_count*node_count*0.9)
-	#process_difficulty(difficulty)
-	#map_shapes()
-	#AT THE MOMENT THESE ARE JUST RANDO SHAPES, BUT WE NEED PLAYABLE PIECES AND SOLUTION PIECES
-	#WHEN PASSED IN, THESE HAVE TO BE POSITIONS NOT JUST COORDINATES
-	#SHAPES WILL BE DRAWN WITH CLOCKWISE DIRECTION
-	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------^^
-	
-	#for now shapes created will involve 9 shapes:
-	playable_shapes_metadata = [playable_metadata.new([Vector2(5,0),
-											 Vector2(8,0),
-											 Vector2(8,3),
-											 Vector2(7,3),
-											 Vector2(7,1),
-											 Vector2(6,1),
-											 Vector2(6,3),
-											 Vector2(5,3)],
-											 Vector2(5,0),
-											 Vector2(8,3)),
-					  playable_metadata.new([Vector2(10,0),
-											 Vector2(11,0),
-											 Vector2(11,1),
-											 Vector2(10,1)], 
-											 Vector2(10,0),
-											 Vector2(11,1)),
-					  playable_metadata.new([Vector2(5,5),
-											 Vector2(5,7),
-											 Vector2(7,7),
-											 Vector2(7,5)], 
-											 Vector2(5,5),
-											 Vector2(7,7)),
-					  playable_metadata.new([Vector2(8,5),
-											 Vector2(8,8),
-											 Vector2(10,8),
-											 Vector2(10,5)], 
-											 Vector2(8,5),
-											 Vector2(10,8)),
-					  playable_metadata.new([Vector2(9,5),
-											 Vector2(9,8),
-											 Vector2(11,8),
-											 Vector2(11,5)], 
-											 Vector2(9,5),
-											 Vector2(11,8))]
-
-	emit_signal("create_pieces", playable_shapes_metadata, playable_pos_dic)
-	
-	var solution_shapes_metadata = playable_shapes_metadata
-	var solution_pos_offsets = find_all_tl_br(solution_shapes_metadata)[0]
-	solution_shapes_metadata = shift_metadata(solution_shapes_metadata, solution_pos_offsets)
-	var solution_pos_dic = create_sol_pos_dic(solution_pos_info, find_node_count(solution_shapes_metadata))
-	
-	print("solution_pos_offsets:", solution_pos_offsets)
-	print("solution_pos_dic:", solution_pos_dic)
-	
-	emit_signal("display_solution",solution_shapes_metadata, solution_pos_dic)

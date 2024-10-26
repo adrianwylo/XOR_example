@@ -24,6 +24,13 @@ var all_shapes: Dictionary
 #anything they aren't connected to
 var overlap_groups: Dictionary
 
+#number on scale of 1-10, higher being more complete to puzzle
+var game_state 
+#dictionary holding what the relative correct positions are from tl's
+var correctness
+#dictionary linking shape_id to original tl
+var correctness_identifier
+
 #Ack signals for shapes
 signal go(id)
 signal snap(id, mouse_pos)
@@ -346,22 +353,30 @@ func _on_lock_timer_timeout() -> void:
 
 #region Initialization
 #creates pieces on board from list of list of positions
-func _on_solution_create_pieces(shape_pieces: Variant, pos_dic: Variant) -> void:
-	for polygon in shape_pieces:
-		shape_create(polygon, pos_dic)
+func _on_solution_create_pieces(shape_pieces: Variant, pos_dic: Variant, correctness_dic: Variant) -> void:
+	correctness = correctness_dic
+	correctness_identifier = {}
+	for polygon_data in shape_pieces:
+		var new_index = shape_create(polygon_data, pos_dic)
+		correctness_identifier[new_index] = coor_to_string(polygon_data.tl)
 
 #create new instance of the playable_shape scene
-func shape_create(metadata, map) -> void:
+func shape_create(metadata, map) -> int:
 	var shape = new_shape.instantiate()
 	shape.pass_metadata(metadata.vertices, metadata.tl, metadata.br)
 	shape.pass_map(map)
+	#connect signals
 	shape.connect("free_drag", _on_piece_free_drag)
 	shape.connect("occupy_drag", _on_piece_occupy_drag)
 	shape.connect("continue_q", _on_piece_continue_q)
 	shape.connect("overlapping", _on_piece_overlap)
 	shape.connect("not_overlapping", _on_piece_no_overlap)
+	
+	#populate playable_piece's data on playable_shape
 	add_child(shape)
-	all_shapes[get_child_count()-1] = shape
+	var child_index = get_child_count()-1
+	all_shapes[child_index] = shape
+	return child_index
 	
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -388,6 +403,11 @@ func _physics_process(delta: float) -> void:
 			
 		else:
 			emit_signal("no_display_group", id)
+	
+	if dragging == false:
+		game_state = check_if_correct()
+		if game_state == 10:
+			print("Correct")
 
 # debug rendition of process
 func _on_test_timer_timeout() -> void: 
@@ -415,6 +435,32 @@ func find_key_with_id(id) -> int:
 			return key
 	return -1
 
+#converts coordinate in graph into a string for identification
+func coor_to_string(coordinate: Vector2i) -> String:
+	return str(coordinate.x) + ',' + str(coordinate.y)
+
+
+func check_if_correct() -> int:
+	var total = all_shapes.size() * all_shapes.size()
+	var correct = 0
+	for index1 in all_shapes:
+		var tl1 = all_shapes[index1].return_grid_coor()
+		var tl1_key = all_shapes[index1].return_id()
+		for index2 in all_shapes:
+			var tl2 = all_shapes[index2].return_grid_coor()
+			var tl2_key = all_shapes[index2].return_id()
+			var displacement = tl2 - tl1
+
+			# Check if tl1_key exists in correctness dictionary
+			if correctness.has(tl1_key):
+				# Check if tl2_key exists within the nested dictionary
+				if correctness[tl1_key].has(tl2_key):
+					# Check if displacement is valid
+					var found_displacement = correctness[tl1_key][tl2_key]
+					if found_displacement == displacement:
+						correct += 1
+	print(correct,"/",total)
+	return round(10 * correct / total)
 #detects whether there is a phony collision
 #func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
 	#var shared_vertices = []

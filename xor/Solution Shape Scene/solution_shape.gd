@@ -58,8 +58,6 @@ var velocity: Vector2 = Vector2.ZERO  # Velocity to keep track of the current sp
 func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
 	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
 	var other_node_id = other_shape_node.return_id()
-	print()
-	print(identity, " entering ", other_node_id)
 	emit_signal("overlapping", other_node_id, identity)
 		
 
@@ -67,7 +65,6 @@ func _on_area_shape_entered(area_rid: RID, area: Area2D, area_shape_index: int, 
 func _on_area_shape_exited(area_rid: RID, area: Area2D, area_shape_index: int, local_shape_index: int) -> void:
 	var other_shape_node = area.shape_owner_get_owner(area.shape_find_owner(area_shape_index)).get_parent()
 	var other_node_id = other_shape_node.return_id()
-	print(identity, " exiting ", other_node_id)
 	emit_signal("not_overlapping",other_node_id , identity)
 #endregion
 

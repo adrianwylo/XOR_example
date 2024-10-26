@@ -27,6 +27,7 @@ var packed_vertices
 var base_shape_vertices
 
 #current metadata 
+#location of this piece in grid notation
 var grid_coor
 #boolean value is shape being dragged?
 var dragging = false
@@ -106,8 +107,11 @@ func return_base_and_pos() -> Dictionary:
 		"abs base vertices": PackedVector2Array(abs_vertices),
 		"position": position
 	}
+	
+# Returns the current grid coordinates of this piece (based off top left)
+func return_grid_coor() -> Vector2i:
+	return grid_coor
 #endregion
-
 
 #region Display Signal functions
 # Processes incoming signals from playable_pieces over how display should function

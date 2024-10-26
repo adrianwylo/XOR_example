@@ -26,6 +26,7 @@ new_shape = ExtResource("1_1w1ic")
 
 [node name="Solution" type="Node2D" parent="."]
 script = ExtResource("6_0c0vp")
+new_node = ExtResource("2_vuyjw")
 
 [node name="Solution_Shapes" type="Node2D" parent="Solution"]
 script = ExtResource("7_vdlfd")
