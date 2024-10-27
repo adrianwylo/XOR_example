@@ -19,6 +19,10 @@ signal not_overlapping(other_id, my_id)
 var tl_pos
 #bottom right corner of shape (coordinates)
 var br_pos
+
+#vector size:
+var vector_size
+
 #identification #
 var identity
 #packaged vertices for polygon definition
@@ -107,6 +111,9 @@ func return_base_and_pos() -> Dictionary:
 		"abs base vertices": PackedVector2Array(abs_vertices),
 		"position": position
 	}
+	
+func return_vector_size() -> Vector2i:
+	return vector_size
 	
 # Returns the current grid coordinates of this piece (based off top left)
 func return_grid_coor() -> Vector2i:
@@ -529,7 +536,7 @@ func _ready() -> void:
 	
 	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
 	
-	
+	vector_size = br_pos - tl_pos
 	
 	# create base shape
 	#NOTE the coordinates passsed in here are relative to the position already

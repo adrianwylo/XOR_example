@@ -29,9 +29,10 @@ var difficulty = randi_range(1,5)
 
 #Game initializer
 func _ready() -> void:
+	screen_size = get_viewport_rect().size
+	print("got signal")
 	assert(node_count > 1, "too little nodes!")
 	assert(margin_size < .5, "margins too big, no space for the nodes!")
-	screen_size = get_viewport_rect().size
 	emit_signal("init_grid", node_count, screen_size, margin_size)
 	
 	while not grid_done: #don't know if this is good logic
@@ -40,9 +41,7 @@ func _ready() -> void:
 	#create math behind correct solution and generates all pieces
 	
 	emit_signal("init_solution", node_count, difficulty, map, sol_info)
-	
-
-
+	get_tree().paused = false
 
 func _on_grid_pieces_grid_done(pos_dic: Variant, sol_dic_info: Variant) -> void:
 	grid_done = true

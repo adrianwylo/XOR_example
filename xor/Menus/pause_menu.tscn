@@ -1,0 +1,58 @@
+[gd_scene load_steps=13 format=3 uid="uid://vwccwajj1cbq"]
+
+[ext_resource type="FontFile" uid="uid://cyxm5c66vxycv" path="res://Fonts/Bowhouse-Light.otf" id="2_wp16o"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_kwj2d"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_jvmxy"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_51mk5"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_g8rlv"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_gwih6"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_vysu4"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_a1ewv"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_n3wgs"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_q5rsn"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_dd8nj"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_w2uwu"]
+
+[node name="Pause_menu" type="CanvasLayer"]
+
+[node name="Restart" type="Button" parent="."]
+offset_left = 80.0
+offset_top = 456.0
+offset_right = 415.0
+offset_bottom = 705.0
+theme_override_colors/font_hover_color = Color(0.959165, 0.717101, 0.605264, 1)
+theme_override_colors/font_color = Color(1, 0.894, 0.769, 1)
+theme_override_colors/font_outline_color = Color(1, 1, 1, 1)
+theme_override_colors/icon_normal_color = Color(0, 0, 0, 0)
+theme_override_fonts/font = ExtResource("2_wp16o")
+theme_override_font_sizes/font_size = 200
+theme_override_styles/focus = SubResource("StyleBoxEmpty_kwj2d")
+theme_override_styles/disabled_mirrored = SubResource("StyleBoxEmpty_jvmxy")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_51mk5")
+theme_override_styles/hover_pressed_mirrored = SubResource("StyleBoxEmpty_g8rlv")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_gwih6")
+theme_override_styles/hover_mirrored = SubResource("StyleBoxEmpty_vysu4")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_a1ewv")
+theme_override_styles/pressed_mirrored = SubResource("StyleBoxEmpty_n3wgs")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_q5rsn")
+theme_override_styles/normal_mirrored = SubResource("StyleBoxEmpty_dd8nj")
+theme_override_styles/normal = SubResource("StyleBoxEmpty_w2uwu")
+text = "Begin"
+icon_alignment = 1
+
+[node name="Unpause" type="Button" parent="."]
+offset_right = 8.0
+offset_bottom = 8.0
+
+[connection signal="pressed" from="Restart" to="." method="_on_start_button_pressed"]

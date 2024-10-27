@@ -208,14 +208,14 @@ func find_all_tl_br(metadatas: Array) -> Array:
 	var l = metadatas[0].tl.x
 	var r = metadatas[0].br.x
 	for metadata in metadatas:
-		print("curtlbr:", [Vector2i(l,t),Vector2i(r,b)])
-		print("tl:", metadata.tl)
-		print("br:", metadata.br)
+		#print("curtlbr:", [Vector2i(l,t),Vector2i(r,b)])
+		#print("tl:", metadata.tl)
+		#print("br:", metadata.br)
 		t = min(t, metadata.tl.y)
 		b = max(b, metadata.br.y)
 		l = min(l, metadata.tl.x)
 		r = max(r, metadata.br.x)
-	print("final tlbr ",  [Vector2i(l,t),Vector2i(r,b)])
+	#print("final tlbr ",  [Vector2i(l,t),Vector2i(r,b)])
 	return [Vector2i(l,t),Vector2i(r,b)]
 
 #surmises node count for solution display to maximize siz of display
@@ -313,7 +313,12 @@ func create_playable(list_of_shapes: Array, node_count: int) -> Array:
 				clear = true
 	return final
 			
-		
+			
+#converts coordinate in graph into a string for identification
+func coor_to_string(coordinate: Vector2i) -> String:
+	return str(coordinate.x) + ',' + str(coordinate.y)
+
+
 #takes the list of playable metadata, and returns a nested dictionary
 #of solution's relative distances
 #{point 1:{point 2: vector difference, .........}, .....}
@@ -321,15 +326,32 @@ func make_solution_metadata(metadatas: Array) -> Dictionary:
 	var final_dic = {}
 	for index1 in range(metadatas.size()):
 		var first_top_left_coor = metadatas[index1].tl
-		var key1 = index1+2
-		var new_dic = {}
-		for index2 in range(metadatas.size()):
-			var second_top_left_coor = metadatas[index2].tl
-			var key2 = index2+2
-			new_dic[key2] = second_top_left_coor - first_top_left_coor
-		final_dic[key1] = new_dic
+		var size_vector1: Vector2i = metadatas[index1].br - metadatas[index1].tl
+		var key1 = coor_to_string(size_vector1)
+		if final_dic.has(key1):
+			for index2 in range(metadatas.size()):
+				if index2 != index1:
+					var second_top_left_coor = metadatas[index2].tl
+					var size_vector2: Vector2i = metadatas[index2].br - metadatas[index2].tl
+					var key2 = coor_to_string(size_vector2)
+					if final_dic[key1].has(key2):
+						final_dic[key1][key2].append(second_top_left_coor - first_top_left_coor)
+					else:
+						final_dic[key1][key2] = [second_top_left_coor - first_top_left_coor]
+		else:
+			var new_dic = {}
+			for index2 in range(metadatas.size()):
+				if index2 != index1:
+					var second_top_left_coor = metadatas[index2].tl
+					var size_vector2: Vector2i = metadatas[index2].br - metadatas[index2].tl
+					var key2 = coor_to_string(size_vector2)
+					if new_dic.has(key2):
+						new_dic[key2].append(second_top_left_coor - first_top_left_coor)
+					else:
+						new_dic[key2] = [second_top_left_coor - first_top_left_coor]
+			final_dic[key1] = new_dic
 	return final_dic
-
+	
 
 #reorders list of playable_metadata objects based on area (smaller area = higher index) 
 func sort_by_area(metadata_list: Array) -> Array:
@@ -352,12 +374,15 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_p
 	#UNFINISHED CODE BLOCK FOR DIFFICULTY MANAGEMENT ----------------------------------------------^^
 	
 	#for now shapes created will involve 9 shapes:
-	var playable_shapes = [[Vector2(5,0),Vector2(8,0),Vector2(8,3),Vector2(7,3),Vector2(7,1),Vector2(6,1),Vector2(6,3),Vector2(5,3)],
-					  				[Vector2(10,0),Vector2(11,0),Vector2(11,1),Vector2(10,1)],
-									[Vector2(4,5),Vector2(4,7),Vector2(6,7),Vector2(6,5)],
-									[Vector2(7,5),Vector2(7,8),Vector2(9,8),Vector2(9,5)],
-									[Vector2(10,5),Vector2(10,8),Vector2(12,8),Vector2(12,5)]]
-	
+	var playable_shapes =  [[Vector2(10,0),Vector2(11,0),Vector2(11,1),Vector2(10,1)],
+							[Vector2(0,0),Vector2(3,0),Vector2(3,3),Vector2(0,3)],
+							[Vector2(4,5),Vector2(4,7),Vector2(6,7),Vector2(6,5)],
+							[Vector2(4,5),Vector2(4,7),Vector2(6,7),Vector2(6,5)],
+							[Vector2(7,5),Vector2(7,8),Vector2(9,8),Vector2(9,5)],
+							[Vector2(10,5),Vector2(10,7),Vector2(13,7),Vector2(13,5)]]
+							#[Vector2(10,0),Vector2(12,0),Vector2(12,1),Vector2(10,1)],
+							#[Vector2(10,0),Vector2(11,0),Vector2(11,2),Vector2(10,2)]]
+	#
 	var playable_shapes_metadata = create_playable(playable_shapes, node_count)
 	
 	playable_shapes_metadata = sort_by_area(playable_shapes_metadata)
@@ -379,10 +404,11 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_p
 	
 	
 	correctness = make_solution_metadata(solution_shapes_metadata)
+	print(correctness)
 	var solution_pos_dic = create_sol_pos_dic(solution_pos_info, sol_dic_node_count)
 	
 	#call to create playable pieces
-	emit_signal("create_pieces", playable_shapes_metadata, playable_pos_dic,correctness)
+	emit_signal("create_pieces", playable_shapes_metadata, playable_pos_dic, correctness)
 	#call to create solution display
 	emit_signal("display_solution", solution_shapes_metadata, solution_pos_dic)
 

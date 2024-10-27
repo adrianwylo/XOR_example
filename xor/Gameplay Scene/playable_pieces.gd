@@ -28,8 +28,6 @@ var overlap_groups: Dictionary
 var game_state 
 #dictionary holding what the relative correct positions are from tl's
 var correctness
-#dictionary linking shape_id to original tl
-var correctness_identifier
 
 #Ack signals for shapes
 signal go(id)
@@ -349,16 +347,19 @@ func _on_lock_timer_timeout() -> void:
 	dragged_shape_id = -1
 	dragging = false 
 	lock_timer.stop()
+	#check game state
+	game_state = check_if_correct()
+	print('GAME STATE:',game_state)
+	if game_state == 5:
+		print("Correct")
 #endregion
 
 #region Initialization
 #creates pieces on board from list of list of positions
 func _on_solution_create_pieces(shape_pieces: Variant, pos_dic: Variant, correctness_dic: Variant) -> void:
 	correctness = correctness_dic
-	correctness_identifier = {}
 	for polygon_data in shape_pieces:
 		var new_index = shape_create(polygon_data, pos_dic)
-		correctness_identifier[new_index] = coor_to_string(polygon_data.tl)
 
 #create new instance of the playable_shape scene
 func shape_create(metadata, map) -> int:
@@ -404,10 +405,6 @@ func _physics_process(delta: float) -> void:
 		else:
 			emit_signal("no_display_group", id)
 	
-	if dragging == false:
-		game_state = check_if_correct()
-		if game_state == 10:
-			print("Correct")
 
 # debug rendition of process
 func _on_test_timer_timeout() -> void: 
@@ -439,41 +436,32 @@ func find_key_with_id(id) -> int:
 func coor_to_string(coordinate: Vector2i) -> String:
 	return str(coordinate.x) + ',' + str(coordinate.y)
 
-
+#function to check if puzzle complete
 func check_if_correct() -> int:
-	var total = all_shapes.size() * all_shapes.size()
+	var check_cor = correctness.duplicate(true)
+	print("\n\n\nTHIS IS CHECK_COR", check_cor, correctness)
+	var total = all_shapes.size() * (all_shapes.size()-1)
 	var correct = 0
-	for index1 in all_shapes:
-		var tl1 = all_shapes[index1].return_grid_coor()
-		var tl1_key = all_shapes[index1].return_id()
-		for index2 in all_shapes:
-			var tl2 = all_shapes[index2].return_grid_coor()
-			var tl2_key = all_shapes[index2].return_id()
-			var displacement = tl2 - tl1
+	#matches keys in correctness and has indexes that have already been matched
+	var checked_indexes = {}
+	for child1 in get_children().slice(2, get_children().size()):
+		var tl1 = child1.return_grid_coor()
+		var tl1_key = coor_to_string(child1.return_vector_size())
+		for child2 in get_children().slice(2, get_children().size()):
+			if child1.return_id() != child2.return_id():
+				var tl2 = child2.return_grid_coor()
+				var tl2_key = coor_to_string(child2.return_vector_size())
+				var displacement = tl2 - tl1
+				print('key1: ',tl1_key, '\nkey2 ',tl2_key)
+				if check_cor.has(tl1_key):
+					if correctness[tl1_key].has(tl2_key):		
+						print('found keys')		
+						print('displacements: ',check_cor[tl1_key][tl2_key])
+						print('calced displacement: ',displacement)		
+						if displacement in check_cor[tl1_key][tl2_key]:
+							check_cor[tl1_key][tl2_key].erase(displacement)
+							correct += 1
+	print(correct,"/",total)
+	return round(5 * correct / total)
 
-			# Check if tl1_key exists in correctness dictionary
-			if correctness.has(tl1_key):
-				# Check if tl2_key exists within the nested dictionary
-				if correctness[tl1_key].has(tl2_key):
-					# Check if displacement is valid
-					var found_displacement = correctness[tl1_key][tl2_key]
-					if found_displacement == displacement:
-						correct += 1
-	#print(correct,"/",total)
-	return round(10 * correct / total)
-#detects whether there is a phony collision
-#func is_corner(shape1: PackedVector2Array, shape2: PackedVector2Array) -> bool:
-	#var shared_vertices = []
-	#for vertex1 in shape1:
-		#for vertex2 in shape2:
-			#if vertex1 == vertex2:
-				#shared_vertices.append(vertex1)
-	#if shared_vertices.size() == 0:
-		#return false
-	#var intersected_polygons = Geometry2D.intersect_polygons(shape1, shape2)
-	#var merge_polygons =  Geometry2D.merge_polygons(shape1, shape2)
-	#if intersected_polygons.size() == 0 and merge_polygons.size() == 2:
-		##sdf("intersecsetwseef ",intersected_polygons)
-		#return true
-	#return false
 #endregion
