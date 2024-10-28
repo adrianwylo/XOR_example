@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://b3w8mbmlaek8r"]
 
-[ext_resource type="Script" path="res://Solution Shape Scene/solution_shape.gd" id="1_ipv7j"]
+[ext_resource type="Script" path="res://GamePlay_Scene/Solutions/Solution Shape Scene/solution_shape.gd" id="1_ipv7j"]
 
 [node name="Solution_shape" type="Area2D"]
 collision_layer = 2

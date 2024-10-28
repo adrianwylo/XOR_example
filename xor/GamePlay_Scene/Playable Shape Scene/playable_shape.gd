@@ -159,7 +159,7 @@ func display_overlap(pol_list):
 	for vertices in pol_list:
 		var polygon_node = Polygon2D.new()
 		polygon_node.polygon = vertices
-		polygon_node.modulate = Color(1, 0.894118, 0.768627, 1) 
+		polygon_node.modulate = Color(1, 0.627451, 0.478431, 1) 
 		add_child(polygon_node)
 		polygon_node.show()
 
@@ -542,7 +542,7 @@ func _ready() -> void:
 	#NOTE the coordinates passsed in here are relative to the position already
 	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
 	base_pol2d.polygon = base_shape_vertices
-	base_pol2d.modulate = Color(1, 0.894118, 0.768627, 1)
+	base_pol2d.modulate = Color(1, 0.627451, 0.478431, 1) 
 	
 	# create clickable collision a little smaller 
 	base_col2d.polygon = base_shape_vertices
@@ -582,15 +582,14 @@ func pol_coor_to_px(vertices: PackedVector2Array, offset: Vector2) -> PackedVect
 func _input(event: InputEvent) -> void:
 	click_event = event
 	if event is InputEventMouseButton and event.button_index == 1 and event.pressed:
+		if Geometry2D.is_point_in_polygon(to_local(event.position), base_col2d.polygon):
+			mouse_offset = event.position-position
+			emit_signal("occupy_drag", identity)
+	if event  is InputEventMouseButton and event.button_index == 1 and not event.pressed:
 		if dragging == true:
 			emit_signal("free_drag", identity, event.position - mouse_offset, coor_to_px(br_pos - Vector2i(1,1)) - coor_to_px(tl_pos))
-		else:
-			if Geometry2D.is_point_in_polygon(to_local(event.position), base_col2d.polygon):
-				#request to start dragging
-				#sdf()
-				#sdf(str(identity) +" wants to move from grid index " + str(grid_coor))
-				mouse_offset = event.position-position
-				emit_signal("occupy_drag", identity)
+
+			
 
 #reacts to go ack
 func _start_dragging(id):

@@ -138,7 +138,7 @@ func display_overlap(pol_list):
 	for vertices in pol_list:
 		var polygon_node = Polygon2D.new()
 		polygon_node.polygon = vertices
-		polygon_node.modulate = Color(1, 0.894118, 0.768627, 1) 
+		polygon_node.modulate = Color(1, 0.627451, 0.478431, 1) 
 		add_child(polygon_node)
 		polygon_node.show()
 
@@ -192,6 +192,7 @@ func find_shape_key(shape: PackedVector2Array, cutout_shapes: Dictionary) -> int
 
 #Performs XOR operation on all children (TODO)
 func XOR_polygons(display_id: int, children_shapes_data: Dictionary):
+	show()
 	var base_pos = children_shapes_data[display_id]["position"]
 	var cutout_count = {} #{int(key): int(Amount of times overlapped)....}
 	var cutout_shapes = {} #{int(key): PackedVector2Array(shape)....}
@@ -474,6 +475,7 @@ func inject_hole(hole: PackedVector2Array, outline: PackedVector2Array, closest_
 #Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	#parent connections
+	hide()
 	playable_pieces = get_parent()
 	if playable_pieces:
 		playable_pieces.connect("display_group", _show_group)
@@ -492,7 +494,7 @@ func _ready() -> void:
 	#NOTE the coordinates passsed in here are relative to the position already
 	base_shape_vertices = pol_coor_to_px(packed_vertices, tl_pos)
 	base_pol2d.polygon = base_shape_vertices
-	base_pol2d.modulate = Color(1, 0.894118, 0.768627, 1)
+	base_pol2d.modulate = Color(1, 0.627451, 0.478431, 1) 
 	
 	# create clickable collision a little smaller 
 	base_col2d.polygon = base_shape_vertices

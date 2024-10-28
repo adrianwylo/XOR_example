@@ -34,7 +34,7 @@ func _on_main_init_grid(n_c, s_s, m_s) -> void:
 func create_grids() -> void:	
 	#Code right now expects that the orientation is horizontal
 	#decide scale of nodes with reference to screen size
-	var size_scale = node_count * 0.001 #THIS IS A MAGIC NUMBER
+	var size_scale = node_count * 0.0012 #THIS IS A MAGIC NUMBER
 	
 	#counting margins, length of one side of grid
 	var playable_grid_size_full = screen_size.y
@@ -51,6 +51,7 @@ func create_grids() -> void:
 	playable_grid_offset += margin_offset
 	var len_of_playable_cell = int(playable_grid_size_nodes/(node_count-1))
 	
+	var node_start_position = screen_size/2
 		
 	#added 2 to contribute to the a buffer 
 	for x in range(0, node_count):

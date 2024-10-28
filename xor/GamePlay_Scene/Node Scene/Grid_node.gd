@@ -5,6 +5,8 @@ extends StaticBody2D
 # Reference to the Sprite node
 @onready var sprite = $Sprite2D 
 
+@export var enter_boolean : bool
+
 signal snap_found(grid_coor)
 
 #size scale determined by the main scene
@@ -18,6 +20,10 @@ var grid_location
 
 #passing in size scale and length of cell
 func initialize_data(size_scale: float, length: float, grid_coordinate: Vector2i, is_edge: bool) -> void:
+	#var tween = get_tree().create_tween().bind_node(self)
+	#tween.tween_property($Sprite, "modulate", Color.RED, 1)
+	#tween.tween_property($Sprite, "scale", Vector2(), 1)
+	#tween.tween_callback($Sprite.queue_free)
 	node_scale = size_scale
 	len_of_cell = length
 	var half_len = len_of_cell/2

@@ -8,6 +8,7 @@ extends Node2D
 
 #Track if the object is being dragged
 var dragging = false 
+var paused = false
 
 #Current dragged shape index
 var dragged_shape_id = -1
@@ -318,12 +319,10 @@ func _on_piece_no_overlap(other_id: int, id: int):
 #region Life of the Drag
 #ack function picking a piece
 func _on_piece_occupy_drag(id) -> void:
-	if dragging == false and dragged_shape_id == -1:
+	if dragging == false and dragged_shape_id == -1 and not paused:
 		#id's are the same as indexes because they don't change
 		dragged_shape_id = id
 		dragged_child = get_child(dragged_shape_id)
-		
-		#turn on flag for going
 		dragging = true
 		emit_signal("go", id)
 
@@ -439,7 +438,6 @@ func coor_to_string(coordinate: Vector2i) -> String:
 #function to check if puzzle complete
 func check_if_correct() -> int:
 	var check_cor = correctness.duplicate(true)
-	print("\n\n\nTHIS IS CHECK_COR", check_cor, correctness)
 	var total = all_shapes.size() * (all_shapes.size()-1)
 	var correct = 0
 	#matches keys in correctness and has indexes that have already been matched
@@ -452,16 +450,23 @@ func check_if_correct() -> int:
 				var tl2 = child2.return_grid_coor()
 				var tl2_key = coor_to_string(child2.return_vector_size())
 				var displacement = tl2 - tl1
-				print('key1: ',tl1_key, '\nkey2 ',tl2_key)
+				#print('key1: ',tl1_key, '\nkey2 ',tl2_key)
 				if check_cor.has(tl1_key):
 					if correctness[tl1_key].has(tl2_key):		
-						print('found keys')		
-						print('displacements: ',check_cor[tl1_key][tl2_key])
-						print('calced displacement: ',displacement)		
+						#print('found keys')		
+						#print('displacements: ',check_cor[tl1_key][tl2_key])
+						#print('calced displacement: ',displacement)		
 						if displacement in check_cor[tl1_key][tl2_key]:
 							check_cor[tl1_key][tl2_key].erase(displacement)
 							correct += 1
-	print(correct,"/",total)
+	#print(correct,"/",total)
 	return round(5 * correct / total)
 
 #endregion
+
+
+
+
+func _on_gameplay_piece_no_move(boolean: Variant) -> void:
+	print('paused is now ', boolean)
+	paused = boolean

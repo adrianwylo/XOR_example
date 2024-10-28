@@ -355,10 +355,10 @@ func make_solution_metadata(metadatas: Array) -> Dictionary:
 
 #reorders list of playable_metadata objects based on area (smaller area = higher index) 
 func sort_by_area(metadata_list: Array) -> Array:
-	print(metadata_list)
+	#print(metadata_list)
 	var final_metadata = metadata_list
 	final_metadata.sort_custom(func(a, b): return a.area > b.area)
-	print(final_metadata)
+	#print(final_metadata)
 	return final_metadata
 	
 #script call
@@ -404,7 +404,7 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_p
 	
 	
 	correctness = make_solution_metadata(solution_shapes_metadata)
-	print(correctness)
+	#print(correctness)
 	var solution_pos_dic = create_sol_pos_dic(solution_pos_info, sol_dic_node_count)
 	
 	#call to create playable pieces

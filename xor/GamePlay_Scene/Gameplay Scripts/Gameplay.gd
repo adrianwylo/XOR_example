@@ -27,10 +27,16 @@ var sol_info
 var difficulty = randi_range(1,5)
 #-------------------------------------------------------------------------------
 
+var paused = false
+
+signal piece_no_move(boolean)
+
 #Game initializer
 func _ready() -> void:
+	print(get_tree_string_pretty())
+	$Transition.play_entrance()
+	$Pause_Menu.hide()
 	screen_size = get_viewport_rect().size
-	print("got signal")
 	assert(node_count > 1, "too little nodes!")
 	assert(margin_size < .5, "margins too big, no space for the nodes!")
 	emit_signal("init_grid", node_count, screen_size, margin_size)
@@ -41,10 +47,26 @@ func _ready() -> void:
 	#create math behind correct solution and generates all pieces
 	
 	emit_signal("init_solution", node_count, difficulty, map, sol_info)
-	get_tree().paused = false
+	
+	var root = get_tree().root
 
 func _on_grid_pieces_grid_done(pos_dic: Variant, sol_dic_info: Variant) -> void:
 	grid_done = true
 	map = pos_dic
 	sol_info = sol_dic_info
 	
+
+func _on_transition_pause() -> void:
+	print("starting pause")
+	$Pause_Menu.start_pause()
+	$Pause_Menu.show()
+	
+
+func _on_pause_menu_resume() -> void:
+	$Transition.reset_all()
+	$Transition.play_entrance()
+	emit_signal("piece_no_move", false)
+
+
+func _on_pause_menu_menu_started() -> void:
+	emit_signal("piece_no_move", true)

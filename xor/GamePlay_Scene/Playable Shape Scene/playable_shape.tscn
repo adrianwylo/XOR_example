@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://ck6flabpfj65y"]
 
-[ext_resource type="Script" path="res://Playable Shape Scene/playable_shape.gd" id="1_bcpdf"]
+[ext_resource type="Script" path="res://GamePlay_Scene/Playable Shape Scene/playable_shape.gd" id="1_bcpdf"]
 
 [node name="Puzzle_Shape" type="Area2D"]
 script = ExtResource("1_bcpdf")
