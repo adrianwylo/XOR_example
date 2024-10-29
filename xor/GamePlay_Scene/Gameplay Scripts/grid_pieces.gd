@@ -13,12 +13,16 @@ var node_count
 var playable_pos_dic = {}
 #dictionary of all grid positions for solution display:
 var solution_pos_dic_info 
+#length between node
+var len_of_playable_cell
 #-------------------------------------------------------------------------------
 
 #signal for completion
 signal grid_done(playable_pos_dic)
 
 signal snap_info(grid_pos)
+
+signal return_bounds(bounds_info)
 
 # Called by main
 func _on_main_init_grid(n_c, s_s, m_s) -> void:
@@ -49,7 +53,7 @@ func create_grids() -> void:
 	
 	#changes position of grid
 	playable_grid_offset += margin_offset
-	var len_of_playable_cell = int(playable_grid_size_nodes/(node_count-1))
+	len_of_playable_cell = int(playable_grid_size_nodes/(node_count-1))
 	
 	var node_start_position = screen_size/2
 		
@@ -93,4 +97,10 @@ func _on_playable_pieces_snap(id: Variant, corner_pos: Variant, area_offset: Var
 				if brchild.pos_found_in_node(bot_right_pos):
 					emit_signal("snap_info", tlchild.ret_grid_location())
 
+	
+
+
+func _on_playable_pieces_find_bounds() -> void:
+	var half_length = len_of_playable_cell/2
+	emit_signal("return_bounds", int(half_length))
 	

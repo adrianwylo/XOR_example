@@ -15,7 +15,8 @@ func start_pause() -> void:
 
 
 func _on_restart_pressed() -> void:
-	$AnimationPlayer.play("Game")
+	$AnimationPlayer.play("NewGame")
+	await $AnimationPlayer.animation_finished
 	get_tree().change_scene_to_file(gameplay)
 
 

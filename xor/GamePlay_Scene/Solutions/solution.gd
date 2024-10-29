@@ -244,44 +244,77 @@ func shift_shape(vertices: Array, pos_offset: Vector2i) -> Array:
 #creates a solution from playable_shapes_metadata
 func create_solution(playable_shapes_metadata: Array, node_count: int) -> Array:
 	var solution = []
+	var counter = 0
 	for metadata in playable_shapes_metadata:
+		#print(counter, " shapes completed")
 		var new_shape_fits = false
 		var working_metadata
 		#NEED TO DEBUG
+		var while_counter = 0
 		while not new_shape_fits:
+			#print(while_counter, " while runs completed")
+			while_counter +=1
+			if while_counter>1000:
+				return create_solution(playable_shapes_metadata, node_count)
+			#edge case flag
+			var no_edge_case = true
 			#make a new shape
-			var shape_size_vector: Vector2i = metadata.br - metadata.tl
+			var new_shape_size: Vector2i = metadata.br - metadata.tl
+			
+			
 			#might wanna check this math im watching tv
 			#this ensures that the new vector is within the bounds found from the shape
-			var new_position = Vector2i(randi_range(0,node_count - shape_size_vector.x - 1),randi_range(0,node_count - shape_size_vector.y - 1))
+			var new_position = Vector2i(randi_range(0,node_count - new_shape_size.x - 1),randi_range(0,node_count - new_shape_size.y - 1))
 			#print("new_position = ", new_position)
 			var new_shape = shift_shape(metadata.vertices,new_position - metadata.tl)
+			
 			#print("new shape is ", new_shape)
 			#establish vertex overlaps needed to add new random shape
-			var no_of_overlaps_needed = solution.size() - 3
+			var no_of_overlaps_needed = solution.size() - 2
 			if no_of_overlaps_needed < 1:
 				no_of_overlaps_needed = 1
 			#count of how many 
 			var no_of_overlaps = 0
 			for past_shape_metadata in solution:
+				var past_shape_vertices = past_shape_metadata.vertices
+				var past_shape_size: Vector2i = past_shape_metadata.br - past_shape_metadata.tl
+				
+				#remember currentl format says we can't have the same pieces
+				if past_shape_size.y == new_shape_size.y:
+					var distance_test = past_shape_metadata.tl - find_tl_br(new_shape)[0]
+					if distance_test.y == 0:
+						if Geometry2D.merge_polygons(past_shape_vertices, new_shape).size() == 1:
+							#print("Y merge polygons check passed - edgy case detected.")
+							no_edge_case = false
+				if past_shape_size.x == new_shape_size.x:
+					var distance_test = past_shape_metadata.tl - find_tl_br(new_shape)[0]
+					if distance_test.x == 0:
+						if Geometry2D.merge_polygons(past_shape_vertices, new_shape).size() == 1:
+							#print("X merge polygons check passed - edgy case detected.")
+							no_edge_case = false
+						
+				
 				#find out if a point in the new shape is in a past_shape's region
 				var vertex_in_past_shape = false
+				#check if new shape vertex is in past_shape
 				for vertex in new_shape:
-					if Geometry2D.is_point_in_polygon(vertex, past_shape_metadata.vertices):
-						var past_shape_tlbr = find_tl_br(past_shape_metadata.vertices)
+					if Geometry2D.is_point_in_polygon(vertex, past_shape_vertices):
+						var past_shape_tlbr = find_tl_br(past_shape_vertices)
 						if Vector2i(past_shape_tlbr[1] - past_shape_tlbr[0]) != Vector2i(1,1):
-							for past_vertex in past_shape_metadata.vertices:
-								if vertex in past_shape_metadata.vertices:
-									if randf() <= 0.30:
+							for past_vertex in past_shape_vertices:
+								if vertex in past_shape_vertices:
+									if randf() <= 0.1:
 										vertex_in_past_shape = true
 										break
+										
 				if vertex_in_past_shape:
 					no_of_overlaps += 1
-			if no_of_overlaps >= no_of_overlaps_needed or solution.size() == 0:
+			if (no_of_overlaps >= no_of_overlaps_needed or solution.size() == 0) and no_edge_case:
 				var tlbr = find_tl_br(new_shape)
 				working_metadata = playable_metadata.new(new_shape)
 				new_shape_fits = true
 		solution.append(working_metadata)
+		counter+=1
 	return solution
 
 #creates the new playable_metadata objects in array such that they don't overlap
@@ -377,11 +410,11 @@ func _on_main_init_solution(node_count: Variant, difficulty: Variant, playable_p
 	var playable_shapes =  [[Vector2(10,0),Vector2(11,0),Vector2(11,1),Vector2(10,1)],
 							[Vector2(0,0),Vector2(3,0),Vector2(3,3),Vector2(0,3)],
 							[Vector2(4,5),Vector2(4,7),Vector2(6,7),Vector2(6,5)],
-							[Vector2(4,5),Vector2(4,7),Vector2(6,7),Vector2(6,5)],
+							[Vector2(4,5),Vector2(4,6),Vector2(6,6),Vector2(6,5)],
+							[Vector2(5,5),Vector2(5,7),Vector2(6,7),Vector2(6,5)],
 							[Vector2(7,5),Vector2(7,8),Vector2(9,8),Vector2(9,5)],
 							[Vector2(10,5),Vector2(10,7),Vector2(13,7),Vector2(13,5)]]
-							#[Vector2(10,0),Vector2(12,0),Vector2(12,1),Vector2(10,1)],
-							#[Vector2(10,0),Vector2(11,0),Vector2(11,2),Vector2(10,2)]]
+							
 	#
 	var playable_shapes_metadata = create_playable(playable_shapes, node_count)
 	

@@ -29,6 +29,10 @@ var overlap_groups: Dictionary
 var game_state 
 #dictionary holding what the relative correct positions are from tl's
 var correctness
+#bounds for grid (used in snapping)
+
+var cell_len = 0
+
 
 #Ack signals for shapes
 signal go(id)
@@ -36,6 +40,8 @@ signal snap(id, mouse_pos)
 signal start_snap(grid_pos, id)
 signal display_group(display_id, children)
 signal no_display_group(id)
+signal find_bounds()
+signal solved()
 
 #class definition for overlap metadata
 class overlap:
@@ -350,20 +356,28 @@ func _on_lock_timer_timeout() -> void:
 	game_state = check_if_correct()
 	print('GAME STATE:',game_state)
 	if game_state == 5:
+		paused = true
 		print("Correct")
+		emit_signal("solved")
 #endregion
 
 #region Initialization
 #creates pieces on board from list of list of positions
 func _on_solution_create_pieces(shape_pieces: Variant, pos_dic: Variant, correctness_dic: Variant) -> void:
+	emit_signal("find_bounds")
 	correctness = correctness_dic
+	while cell_len == 0:
+		print("waiting for new grid bound")
 	for polygon_data in shape_pieces:
 		var new_index = shape_create(polygon_data, pos_dic)
+
+func _on_grid_pieces_return_bounds(bounds_info: Variant) -> void:
+	cell_len = bounds_info
 
 #create new instance of the playable_shape scene
 func shape_create(metadata, map) -> int:
 	var shape = new_shape.instantiate()
-	shape.pass_metadata(metadata.vertices, metadata.tl, metadata.br)
+	shape.pass_metadata(metadata.vertices, metadata.tl, metadata.br, cell_len)
 	shape.pass_map(map)
 	#connect signals
 	shape.connect("free_drag", _on_piece_free_drag)
@@ -381,7 +395,7 @@ func shape_create(metadata, map) -> int:
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# Start the timer with 10 seconds interval for testing purposes
-	timer.wait_time = 7
+	#timer.wait_time = 7
 	#timer.start()
 	overlap_groups = {}
 	all_shapes = {}
@@ -390,7 +404,7 @@ func _ready() -> void:
 
 #region Action
 #Calculates overlaps constantly and changes views
-func _physics_process(delta: float) -> void:
+func _process(delta: float) -> void:
 	for id in all_shapes:
 		var key = find_key_with_id(id)
 		if key != -1:
@@ -406,21 +420,21 @@ func _physics_process(delta: float) -> void:
 	
 
 # debug rendition of process
-func _on_test_timer_timeout() -> void: 
-	#sdf("\n\n\n NEW ROUND----------------------------------------------------")
-	for id in all_shapes:
-		var key = find_key_with_id(id)
-		if key != -1:
-			#sdf("\nindexes in group = ", overlap_groups[key].indexes_involved)
-			#update display indexes based on whether theres a shape being dragged:
-			overlap_groups[key].recalc_display_wo(dragged_shape_id)
-			var grouped_children = []
-			for index in overlap_groups[key].indexes_involved:
-				grouped_children.append(all_shapes[index])
-			emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
-			
-		else:
-			emit_signal("no_display_group", id)
+#func _on_test_timer_timeout() -> void: 
+	##sdf("\n\n\n NEW ROUND----------------------------------------------------")
+	#for id in all_shapes:
+		#var key = find_key_with_id(id)
+		#if key != -1:
+			##sdf("\nindexes in group = ", overlap_groups[key].indexes_involved)
+			##update display indexes based on whether theres a shape being dragged:
+			#overlap_groups[key].recalc_display_wo(dragged_shape_id)
+			#var grouped_children = []
+			#for index in overlap_groups[key].indexes_involved:
+				#grouped_children.append(all_shapes[index])
+			#emit_signal("display_group",overlap_groups[key].display_index, grouped_children)
+			#
+		#else:
+			#emit_signal("no_display_group", id)
 #endregion
 
 #region Helpers
@@ -459,14 +473,11 @@ func check_if_correct() -> int:
 						if displacement in check_cor[tl1_key][tl2_key]:
 							check_cor[tl1_key][tl2_key].erase(displacement)
 							correct += 1
-	#print(correct,"/",total)
+	print(correct,"/",total)
 	return round(5 * correct / total)
 
-#endregion
-
-
-
-
+#pause menu state changer
 func _on_gameplay_piece_no_move(boolean: Variant) -> void:
 	print('paused is now ', boolean)
 	paused = boolean
+#endregion

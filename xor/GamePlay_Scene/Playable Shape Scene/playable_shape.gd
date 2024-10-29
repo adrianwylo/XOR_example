@@ -19,6 +19,11 @@ signal not_overlapping(other_id, my_id)
 var tl_pos
 #bottom right corner of shape (coordinates)
 var br_pos
+#cell length
+var cell_length
+var grid_tl
+var grid_br
+
 
 #vector size:
 var vector_size
@@ -532,10 +537,15 @@ func _ready() -> void:
 	grid_coor = tl_pos
 	
 	# for movement bounds
-	screen_size = Vector2i(get_viewport_rect().size)
-	
+	screen_size = get_viewport_rect().size
 	area_offset = coor_to_px(br_pos) - coor_to_px(tl_pos)
 	
+	#pixel bounds for mouse
+	grid_tl = coor_to_px(Vector2i(0,0)) + Vector2(-cell_length, -cell_length)
+	grid_br = coor_to_px(Vector2i(map.size() - 1,map.size() - 1)) + Vector2(cell_length, cell_length)
+	
+	
+	#For shape identification
 	vector_size = br_pos - tl_pos
 	
 	# create base shape
@@ -549,18 +559,19 @@ func _ready() -> void:
 
 
 #process passed metadata
-func pass_metadata(vertices: Array, tl: Vector2i, br: Vector2i) -> void:
+func pass_metadata(vertices: Array, tl: Vector2i, br: Vector2i, cell_len: int) -> void:
 	#assert(vertices.size() > 2, "not a shape")
 	packed_vertices = PackedVector2Array(vertices)
 	tl_pos = tl
 	br_pos = br
+	cell_length = cell_len
 
 #save map from coordinate to position
 func pass_map(pos_dic) -> void:
 	map = pos_dic
 
 # Converts a single vertex into pixel coordinates
-func coor_to_px(vertex: Vector2i) -> Vector2i:
+func coor_to_px(vertex: Vector2i) -> Vector2:
 	var x_key = str(vertex.x)
 	var y_key = str(vertex.y)
 	assert(map.has(x_key), "x not found")
@@ -587,9 +598,7 @@ func _input(event: InputEvent) -> void:
 			emit_signal("occupy_drag", identity)
 	if event  is InputEventMouseButton and event.button_index == 1 and not event.pressed:
 		if dragging == true:
-			emit_signal("free_drag", identity, event.position - mouse_offset, coor_to_px(br_pos - Vector2i(1,1)) - coor_to_px(tl_pos))
-
-			
+			emit_signal("free_drag", identity, position, coor_to_px(br_pos - Vector2i(1,1)) - coor_to_px(tl_pos))
 
 #reacts to go ack
 func _start_dragging(id):
@@ -613,7 +622,7 @@ func snap_to_grid(grid_pos):
 	snapping = true
 
 #clamps shape movement and modifies children
-func _physics_process(delta: float) -> void:
+func _process(delta: float) -> void:
 	#display related -------------------------------------------------------------------------------
 	if is_in_group:
 		base_pol2d.hide()
@@ -638,5 +647,7 @@ func _physics_process(delta: float) -> void:
 		var target_position = get_global_mouse_position() + drag_offset
 		target_position = target_position.clamp(Vector2.ZERO, screen_size - area_offset)
 		position = position.lerp(target_position, smooth_factor)
-		position = position.clamp(Vector2.ZERO, screen_size - area_offset)
+		#additional vector is because of a roudning issue
+		position = position.clamp(grid_tl, grid_br - area_offset - Vector2(1,1)) 
+			
 #endregion
